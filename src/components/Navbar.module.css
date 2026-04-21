@@ -91,6 +91,29 @@
   color: var(--color-text-primary);
 }
 
+.writeBtn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.writeBtn:hover {
+  background: var(--color-accent-sage);
+  border-color: var(--color-accent-sage);
+  color: var(--color-text-primary);
+}
+
 .menuBtn {
   height: 36px;
   padding: 0 18px;
