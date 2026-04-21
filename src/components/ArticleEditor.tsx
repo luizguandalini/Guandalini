@@ -176,6 +176,85 @@ function BlockRow({
   )
 }
 
+// ── Image with error fallback ────────────────────────────────────────
+
+function BrokenImageIllustration() {
+  return (
+    <svg
+      viewBox="0 0 280 158"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={styles.brokenSvg}
+      aria-hidden
+    >
+      {/* Sky */}
+      <rect width="280" height="158" fill="#F0EBE0" />
+
+      {/* Sun */}
+      <circle cx="216" cy="44" r="20" fill="#B8C9C0" opacity="0.45" />
+      <circle cx="216" cy="44" r="13" fill="#B8C9C0" opacity="0.35" />
+
+      {/* Far mountain */}
+      <path d="M100 126 L158 62 L216 126Z" fill="#B8C9C0" opacity="0.35" />
+
+      {/* Near mountain */}
+      <path d="M30 126 L90 56 L150 126Z" fill="#B8C9C0" opacity="0.55" />
+
+      {/* Ground */}
+      <rect x="0" y="122" width="280" height="36" fill="#B8C9C0" opacity="0.18" />
+
+      {/* Broken frame lines — top-left to bottom-right diagonal */}
+      <line x1="0" y1="0" x2="280" y2="158" stroke="#C0392B" strokeWidth="1.5" opacity="0.18" strokeLinecap="round" />
+      <line x1="280" y1="0" x2="0" y2="158" stroke="#C0392B" strokeWidth="1.5" opacity="0.18" strokeLinecap="round" />
+
+      {/* Error badge — centred */}
+      <circle cx="140" cy="79" r="22" fill="white" opacity="0.88" />
+      <circle cx="140" cy="79" r="18" fill="#FEF0F0" />
+      {/* X mark */}
+      <line x1="133" y1="72" x2="147" y2="86" stroke="#C0392B" strokeWidth="2.2" strokeLinecap="round" />
+      <line x1="147" y1="72" x2="133" y2="86" stroke="#C0392B" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function ImageWithFallback({
+  src,
+  alt,
+  imgClassName,
+  wrapClassName,
+}: {
+  src: string
+  alt: string
+  imgClassName: string
+  wrapClassName: string
+}) {
+  const [errored, setErrored] = useState(false)
+
+  // Reset error whenever src changes so the user can fix the URL
+  useEffect(() => { setErrored(false) }, [src])
+
+  if (errored) {
+    return (
+      <div className={`${wrapClassName} ${styles.imgErrorWrap}`}>
+        <BrokenImageIllustration />
+        <div className={styles.imgErrorInfo}>
+          <span className={styles.imgErrorTitle}>Imagem não encontrada</span>
+          <span className={styles.imgErrorSub}>Verifique a URL e tente novamente</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={imgClassName}
+      onError={() => setErrored(true)}
+    />
+  )
+}
+
 // ── Preview components ───────────────────────────────────────────────
 
 const BLOCK_PLACEHOLDERS: Record<BlockType, string> = {
@@ -220,11 +299,12 @@ function Preview({ data }: { data: ArticleData }) {
       {/* Hero image */}
       <figure className={styles.previewHeroFig}>
         {data.heroImage ? (
-          <img
+          <ImageWithFallback
+            key={data.heroImage}
             src={data.heroImage}
             alt={data.heroCaption}
-            className={styles.previewHeroImg}
-            onError={(e) => (e.currentTarget.style.display = 'none')}
+            imgClassName={styles.previewHeroImg}
+            wrapClassName={styles.previewHeroImg}
           />
         ) : (
           <div className={styles.previewHeroPlaceholder}>
@@ -261,11 +341,12 @@ function Preview({ data }: { data: ArticleData }) {
             return (
               <figure key={block.id} className={styles.previewFig}>
                 {block.src ? (
-                  <img
+                  <ImageWithFallback
+                    key={block.src}
                     src={block.src}
                     alt={block.caption}
-                    className={styles.previewImg}
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                    imgClassName={styles.previewImg}
+                    wrapClassName={styles.previewImg}
                   />
                 ) : (
                   <div className={styles.previewImgPlaceholder}>
