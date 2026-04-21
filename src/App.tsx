@@ -4,27 +4,121 @@ import { HomePage } from './components/HomePage'
 import { ArticlePost } from './components/ArticlePost'
 import { ArticleEditor } from './components/ArticleEditor'
 import { Footer } from './components/Footer'
+import { LoginPage } from './components/LoginPage'
+import { AdminLayout, type AdminTab } from './components/AdminLayout'
+import { AdminAuthors } from './components/AdminAuthors'
+import { AdminNameList } from './components/AdminNameList'
+import { badgesApi, categoriesApi } from './api'
+import { useAuth } from './auth'
 
-type Page = 'home' | 'article' | 'editor'
+type Page =
+  | { name: 'home' }
+  | { name: 'article'; id: string }
+  | { name: 'editor';  id?: string }
+  | { name: 'admin';   tab: AdminTab }
 
 export default function App() {
-  const [page, setPage] = useState<Page>('home')
+  const { user, loading } = useAuth()
+  const [page, setPage] = useState<Page>({ name: 'home' })
 
-  if (page === 'editor') {
-    return <ArticleEditor onExit={() => setPage('home')} />
+  // ── Global splash while we check the token ──
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'var(--color-bg)',
+        color: 'var(--color-text-secondary)',
+        fontSize: '0.875rem',
+      }}>
+        Carregando…
+      </div>
+    )
+  }
+
+  // ── Not authenticated → login screen ──
+  if (!user) {
+    return <LoginPage />
+  }
+
+  // ── Authenticated routes ──
+  const go = (p: Page) => setPage(p)
+
+  // Editor is full-screen (no navbar/footer)
+  if (page.name === 'editor') {
+    return (
+      <ArticleEditor
+        onExit={() => go({ name: 'home' })}
+        onPublished={(id) => go({ name: 'article', id })}
+        articleId={page.id}
+      />
+    )
   }
 
   return (
     <>
       <Navbar
-        onLogoClick={() => setPage('home')}
-        onWriteClick={() => setPage('editor')}
+        onLogoClick={() => go({ name: 'home' })}
+        onWriteClick={() => go({ name: 'editor' })}
+        onAdminClick={() => go({ name: 'admin', tab: 'authors' })}
       />
-      {page === 'home' ? (
-        <HomePage onOpenArticle={() => setPage('article')} />
-      ) : (
-        <ArticlePost onBack={() => setPage('home')} />
+
+      {page.name === 'home' && (
+        <HomePage onOpenArticle={(id) => go({ name: 'article', id })} />
       )}
+
+      {page.name === 'article' && (
+        <ArticlePost
+          articleId={page.id}
+          onBack={() => go({ name: 'home' })}
+          onOpenOther={(id) => go({ name: 'article', id })}
+          onEdit={(id) => go({ name: 'editor', id })}
+        />
+      )}
+
+      {page.name === 'admin' && (
+        <AdminLayout
+          active={page.tab}
+          onNavigate={(tab) => go({ name: 'admin', tab })}
+          title={
+            page.tab === 'authors'    ? 'Autores' :
+            page.tab === 'categories' ? 'Categorias' :
+                                        'Badges de estilo'
+          }
+          subtitle={
+            page.tab === 'authors'
+              ? 'Gerencie autores reais ou fictícios. Selecione-os no editor ao publicar um artigo.'
+              : page.tab === 'categories'
+                ? 'Categorias para classificar os artigos.'
+                : 'Etiquetas rápidas, ex: "Deep Dive", "Opinião", "Tutorial".'
+          }
+        >
+          {page.tab === 'authors'    && <AdminAuthors />}
+          {page.tab === 'categories' && (
+            <AdminNameList
+              load={categoriesApi.list}
+              create={categoriesApi.create}
+              update={categoriesApi.update}
+              remove={categoriesApi.remove}
+              singular="categoria"
+              maxLength={60}
+              placeholder="Nova categoria…"
+            />
+          )}
+          {page.tab === 'badges' && (
+            <AdminNameList
+              load={badgesApi.list}
+              create={badgesApi.create}
+              update={badgesApi.update}
+              remove={badgesApi.remove}
+              singular="badge"
+              maxLength={60}
+              placeholder="Nova badge…"
+            />
+          )}
+        </AdminLayout>
+      )}
+
       <Footer />
     </>
   )

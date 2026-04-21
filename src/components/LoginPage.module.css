@@ -1,0 +1,130 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-bg-white);
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  padding: 40px 36px;
+}
+
+.brand {
+  font-family: var(--font-sans);
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+  margin-bottom: 32px;
+}
+
+.dot {
+  color: var(--color-accent-sage);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--color-text-primary);
+  line-height: 1.15;
+  margin-bottom: 10px;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+.input {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input:focus {
+  border-color: var(--color-accent-sage);
+}
+
+.input::placeholder {
+  color: #C4C4C4;
+}
+
+.error {
+  font-size: 0.8125rem;
+  color: #C0392B;
+  background: #FEF0F0;
+  border: 1px solid #F5CDC8;
+  border-radius: 10px;
+  padding: 10px 14px;
+  line-height: 1.45;
+}
+
+.submit {
+  margin-top: 8px;
+  height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-text-primary);
+  color: #FFFFFF;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.submit:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+  margin-top: 24px;
+}

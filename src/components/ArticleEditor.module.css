@@ -506,6 +506,28 @@
   justify-content: center;
 }
 
+.previewAuthor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+  text-align: left;
+}
+
+.previewAuthorName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+.previewAuthorRole {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
 .previewBadge {
   font-size: 0.75rem;
   font-weight: 500;

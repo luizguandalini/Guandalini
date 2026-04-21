@@ -77,6 +77,108 @@
   color: var(--color-text-primary);
 }
 
+/* ── Admin row ───────────────────────────────────────── */
+
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.topRow .backBtn {
+  margin-bottom: 0;
+}
+
+.adminRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.editBtn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--color-text-primary);
+  color: #FFFFFF;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.editBtn:hover { opacity: 0.85; }
+
+.pinGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-bg-white);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 4px 6px 4px 14px;
+}
+
+.pinLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+
+.pinButtons {
+  display: flex;
+  gap: 4px;
+}
+
+.pinBtn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pinBtn:hover:not(:disabled) {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+}
+
+.pinBtn:disabled { cursor: not-allowed; opacity: 0.6; }
+
+.pinActive {
+  background: var(--color-accent-sage);
+  color: var(--color-text-primary);
+}
+
+.pinUnpin {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: #B0392B;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pinUnpin:hover { background: #FEF0F0; }
+
 /* ── Header ───────────────────────────────────────────── */
 
 .header {

@@ -25,6 +25,18 @@ dist-ssr/
 .DS_Store
 Thumbs.db
 
+# Env
+.env
+.env.local
+.env.*.local
+
+# Uploads
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Postgres volume
+pgdata/
+
 # Logs
 logs/
 *.log

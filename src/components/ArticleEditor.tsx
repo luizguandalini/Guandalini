@@ -1,7 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import styles from './ArticleEditor.module.css'
+import { articlesApi, authorsApi, badgesApi, categoriesApi } from '../api'
+import type {
+  Article,
+  ArticleBlock,
+  Author,
+  Badge,
+  Category,
+} from '../types'
+import { useAuth } from '../auth'
+import { Avatar } from './Avatar'
 
-// ── Types ──────────────────────────────────────────────────────────
+// ── Block types with local IDs (for drag / delete keys) ──────────────
 
 type BlockType = 'paragraph' | 'heading' | 'pullquote' | 'image'
 
@@ -11,14 +21,15 @@ interface PullquoteBlock { id: string; type: 'pullquote'; text: string }
 interface ImageBlock     { id: string; type: 'image';     src: string; caption: string }
 type Block = ParagraphBlock | HeadingBlock | PullquoteBlock | ImageBlock
 
-interface ArticleData {
-  category:    string
+interface FormData {
+  categoryId:  string | null
+  badgeId:     string | null
+  authorId:    string | null
   title:       string
   subtitle:    string
   heroImage:   string
   heroCaption: string
-  readingTime: string
-  styleBadge:  string
+  readingMin:  number
   body:        Block[]
 }
 
@@ -36,6 +47,25 @@ const BLOCK_LABELS: Record<BlockType, string> = {
   image:     '⊡  Imagem',
 }
 
+function formatReading(min: number): string {
+  return `${min} min de leitura`
+}
+
+// Map API blocks <-> local blocks (local adds id for stable keys)
+
+function toLocalBlocks(blocks: ArticleBlock[]): Block[] {
+  return blocks.map((b) => {
+    if (b.type === 'image') {
+      return { id: uid(), type: 'image', src: b.src, caption: b.caption }
+    }
+    return { id: uid(), type: b.type, text: b.text }
+  })
+}
+
+function toApiBlocks(blocks: Block[]): ArticleBlock[] {
+  return blocks.map(({ id: _id, ...rest }) => rest as ArticleBlock)
+}
+
 // ── Auto-resize textarea hook ────────────────────────────────────────
 
 function useAutoResize(value: string) {
@@ -49,13 +79,8 @@ function useAutoResize(value: string) {
   return ref
 }
 
-// ── Single auto-resize textarea ──────────────────────────────────────
-
 function AutoTextarea({
-  value,
-  onChange,
-  placeholder,
-  className,
+  value, onChange, placeholder, className,
 }: {
   value: string
   onChange: (v: string) => void
@@ -78,12 +103,7 @@ function AutoTextarea({
 // ── Block editor row ─────────────────────────────────────────────────
 
 function BlockRow({
-  block,
-  isFirst,
-  isLast,
-  onChange,
-  onMove,
-  onDelete,
+  block, isFirst, isLast, onChange, onMove, onDelete,
 }: {
   block: Block
   isFirst: boolean
@@ -114,26 +134,9 @@ function BlockRow({
           ))}
         </select>
         <div className={styles.blockActions}>
-          <button
-            className={styles.actionBtn}
-            onClick={() => onMove('up')}
-            disabled={isFirst}
-            aria-label="Mover para cima"
-            title="Mover para cima"
-          >↑</button>
-          <button
-            className={styles.actionBtn}
-            onClick={() => onMove('down')}
-            disabled={isLast}
-            aria-label="Mover para baixo"
-            title="Mover para baixo"
-          >↓</button>
-          <button
-            className={`${styles.actionBtn} ${styles.deleteBtn}`}
-            onClick={onDelete}
-            aria-label="Remover bloco"
-            title="Remover"
-          >✕</button>
+          <button className={styles.actionBtn} onClick={() => onMove('up')} disabled={isFirst} title="Mover para cima">↑</button>
+          <button className={styles.actionBtn} onClick={() => onMove('down')} disabled={isLast} title="Mover para baixo">↓</button>
+          <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={onDelete} title="Remover">✕</button>
         </div>
       </div>
 
@@ -142,6 +145,7 @@ function BlockRow({
           <>
             <input
               type="text"
+              maxLength={1000}
               className={styles.fieldInput}
               value={block.src}
               placeholder="URL da imagem (ex: https://…)"
@@ -149,6 +153,7 @@ function BlockRow({
             />
             <input
               type="text"
+              maxLength={500}
               className={`${styles.fieldInput} ${styles.captionInput}`}
               value={block.caption}
               placeholder="Legenda da imagem"
@@ -158,6 +163,7 @@ function BlockRow({
         ) : block.type === 'heading' ? (
           <input
             type="text"
+            maxLength={200}
             className={`${styles.fieldInput} ${styles.headingInput}`}
             value={block.text}
             placeholder="Título da seção…"
@@ -180,37 +186,17 @@ function BlockRow({
 
 function BrokenImageIllustration() {
   return (
-    <svg
-      viewBox="0 0 280 158"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={styles.brokenSvg}
-      aria-hidden
-    >
-      {/* Sky */}
+    <svg viewBox="0 0 280 158" fill="none" className={styles.brokenSvg} aria-hidden>
       <rect width="280" height="158" fill="#F0EBE0" />
-
-      {/* Sun */}
       <circle cx="216" cy="44" r="20" fill="#B8C9C0" opacity="0.45" />
       <circle cx="216" cy="44" r="13" fill="#B8C9C0" opacity="0.35" />
-
-      {/* Far mountain */}
       <path d="M100 126 L158 62 L216 126Z" fill="#B8C9C0" opacity="0.35" />
-
-      {/* Near mountain */}
-      <path d="M30 126 L90 56 L150 126Z" fill="#B8C9C0" opacity="0.55" />
-
-      {/* Ground */}
+      <path d="M30 126 L90 56 L150 126Z"  fill="#B8C9C0" opacity="0.55" />
       <rect x="0" y="122" width="280" height="36" fill="#B8C9C0" opacity="0.18" />
-
-      {/* Broken frame lines — top-left to bottom-right diagonal */}
       <line x1="0" y1="0" x2="280" y2="158" stroke="#C0392B" strokeWidth="1.5" opacity="0.18" strokeLinecap="round" />
       <line x1="280" y1="0" x2="0" y2="158" stroke="#C0392B" strokeWidth="1.5" opacity="0.18" strokeLinecap="round" />
-
-      {/* Error badge — centred */}
       <circle cx="140" cy="79" r="22" fill="white" opacity="0.88" />
       <circle cx="140" cy="79" r="18" fill="#FEF0F0" />
-      {/* X mark */}
       <line x1="133" y1="72" x2="147" y2="86" stroke="#C0392B" strokeWidth="2.2" strokeLinecap="round" />
       <line x1="147" y1="72" x2="133" y2="86" stroke="#C0392B" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
@@ -218,10 +204,7 @@ function BrokenImageIllustration() {
 }
 
 function ImageWithFallback({
-  src,
-  alt,
-  imgClassName,
-  wrapClassName,
+  src, alt, imgClassName, wrapClassName,
 }: {
   src: string
   alt: string
@@ -229,8 +212,6 @@ function ImageWithFallback({
   wrapClassName: string
 }) {
   const [errored, setErrored] = useState(false)
-
-  // Reset error whenever src changes so the user can fix the URL
   useEffect(() => { setErrored(false) }, [src])
 
   if (errored) {
@@ -245,17 +226,10 @@ function ImageWithFallback({
     )
   }
 
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className={imgClassName}
-      onError={() => setErrored(true)}
-    />
-  )
+  return <img src={src} alt={alt} className={imgClassName} onError={() => setErrored(true)} />
 }
 
-// ── Preview components ───────────────────────────────────────────────
+// ── Preview ───────────────────────────────────────────────────────────
 
 const BLOCK_PLACEHOLDERS: Record<BlockType, string> = {
   paragraph: 'Escreva o parágrafo…',
@@ -265,17 +239,25 @@ const BLOCK_PLACEHOLDERS: Record<BlockType, string> = {
 }
 
 function g(hasValue: boolean) {
-  // Returns ghost class when value is empty
   return hasValue ? '' : ` ${styles.previewGhost}`
 }
 
-function Preview({ data }: { data: ArticleData }) {
+interface PreviewProps {
+  data:       FormData
+  categories: Category[]
+  badges:     Badge[]
+  author:     Author | null
+}
+
+function Preview({ data, categories, badges, author }: PreviewProps) {
+  const category = categories.find((c) => c.id === data.categoryId)
+  const badge    = badges.find((b) => b.id === data.badgeId)
+
   return (
     <div className={styles.previewArticle}>
-      {/* Header */}
       <div className={styles.previewHeader}>
-        <span className={`${styles.previewCategory}${g(!!data.category)}`}>
-          · {data.category || 'ex: Inteligência Artificial'}
+        <span className={`${styles.previewCategory}${g(!!category)}`}>
+          · {category?.name || 'ex: Inteligência Artificial'}
         </span>
 
         <h1 className={`${styles.previewTitle}${g(!!data.title)}`}>
@@ -287,16 +269,25 @@ function Preview({ data }: { data: ArticleData }) {
         </p>
 
         <div className={styles.previewBadges}>
-          <span className={`${styles.previewBadge}${g(!!data.readingTime)}`}>
-            {data.readingTime || 'ex: 8 min de leitura'}
+          <span className={styles.previewBadge}>
+            {formatReading(data.readingMin)}
           </span>
-          <span className={`${styles.previewBadge}${g(!!data.styleBadge)}`}>
-            {data.styleBadge || 'ex: Deep Dive'}
+          <span className={`${styles.previewBadge}${g(!!badge)}`}>
+            {badge?.name || 'ex: Deep Dive'}
           </span>
         </div>
+
+        {author && (
+          <div className={styles.previewAuthor}>
+            <Avatar src={author.avatarUrl} name={author.name} crop={author.avatarCrop} size={36} />
+            <div>
+              <div className={styles.previewAuthorName}>{author.name}</div>
+              <div className={styles.previewAuthorRole}>{author.role}</div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Hero image */}
       <figure className={styles.previewHeroFig}>
         {data.heroImage ? (
           <ImageWithFallback
@@ -316,27 +307,14 @@ function Preview({ data }: { data: ArticleData }) {
         </figcaption>
       </figure>
 
-      {/* Body */}
       <div className={styles.previewBody}>
         {data.body.map((block) => {
           if (block.type === 'paragraph')
-            return (
-              <p key={block.id} className={`${styles.previewParagraph}${g(!!block.text)}`}>
-                {block.text || BLOCK_PLACEHOLDERS.paragraph}
-              </p>
-            )
+            return <p key={block.id} className={`${styles.previewParagraph}${g(!!block.text)}`}>{block.text || BLOCK_PLACEHOLDERS.paragraph}</p>
           if (block.type === 'heading')
-            return (
-              <h2 key={block.id} className={`${styles.previewHeading}${g(!!block.text)}`}>
-                {block.text || BLOCK_PLACEHOLDERS.heading}
-              </h2>
-            )
+            return <h2 key={block.id} className={`${styles.previewHeading}${g(!!block.text)}`}>{block.text || BLOCK_PLACEHOLDERS.heading}</h2>
           if (block.type === 'pullquote')
-            return (
-              <blockquote key={block.id} className={`${styles.previewPullquote}${g(!!block.text)}`}>
-                {block.text || BLOCK_PLACEHOLDERS.pullquote}
-              </blockquote>
-            )
+            return <blockquote key={block.id} className={`${styles.previewPullquote}${g(!!block.text)}`}>{block.text || BLOCK_PLACEHOLDERS.pullquote}</blockquote>
           if (block.type === 'image')
             return (
               <figure key={block.id} className={styles.previewFig}>
@@ -368,41 +346,86 @@ function Preview({ data }: { data: ArticleData }) {
 // ── Main editor ──────────────────────────────────────────────────────
 
 interface ArticleEditorProps {
-  onExit: () => void
+  onExit:       () => void
+  onPublished:  (id: string) => void
+  articleId?:   string
 }
 
-export function ArticleEditor({ onExit }: ArticleEditorProps) {
-  const [data, setData] = useState<ArticleData>({
-    category: '',
-    title: '',
-    subtitle: '',
-    heroImage: '',
-    heroCaption: '',
-    readingTime: '',
-    styleBadge: '',
-    body: [defaultBlock()],
-  })
+const EMPTY_FORM: FormData = {
+  categoryId:  null,
+  badgeId:     null,
+  authorId:    null,
+  title:       '',
+  subtitle:    '',
+  heroImage:   '',
+  heroCaption: '',
+  readingMin:  5,
+  body:        [defaultBlock()],
+}
 
-  const [saved, setSaved] = useState(false)
+export function ArticleEditor({ onExit, onPublished, articleId }: ArticleEditorProps) {
+  const { user } = useAuth()
+
+  const [data, setData] = useState<FormData>(EMPTY_FORM)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [badges,     setBadges]     = useState<Badge[]>([])
+  const [authors,    setAuthors]    = useState<Author[]>([])
+
+  const [publishing, setPublishing] = useState(false)
+  const [publishErr, setPublishErr] = useState<string | null>(null)
+  const [savedAt,    setSavedAt]    = useState<Date | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const update = useCallback(<K extends keyof ArticleData>(key: K, value: ArticleData[K]) => {
-    setData((d) => ({ ...d, [key]: value }))
-    setSaved(false)
+  // Load lookup data + article (if editing) on mount
+  useEffect(() => {
+    (async () => {
+      const [cats, bds, authorsPage] = await Promise.all([
+        categoriesApi.list(),
+        badgesApi.list(),
+        authorsApi.list(1, 50),
+      ])
+      setCategories(cats.items)
+      setBadges(bds.items)
+      setAuthors(authorsPage.items)
+
+      if (articleId) {
+        try {
+          const a = await articlesApi.get(articleId)
+          setData({
+            categoryId:  a.category?.id ?? null,
+            badgeId:     a.badge?.id ?? null,
+            authorId:    a.author?.id ?? null,
+            title:       a.title,
+            subtitle:    a.subtitle ?? '',
+            heroImage:   a.heroImage ?? '',
+            heroCaption: a.heroCaption ?? '',
+            readingMin:  a.readingTimeMin,
+            body:        a.body.length > 0 ? toLocalBlocks(a.body) : [defaultBlock()],
+          })
+        } catch (err) {
+          console.error(err)
+        }
+      }
+    })()
+  }, [articleId])
+
+  const markDraft = useCallback(() => {
+    setSavedAt(null)
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => setSaved(true), 1200)
+    saveTimer.current = setTimeout(() => setSavedAt(new Date()), 1200)
   }, [])
+
+  const update = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
+    setData((d) => ({ ...d, [key]: value }))
+    markDraft()
+  }, [markDraft])
 
   const updateBlock = useCallback((id: string, block: Block) => {
     setData((d) => ({ ...d, body: d.body.map((b) => (b.id === id ? block : b)) }))
-    setSaved(false)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => setSaved(true), 1200)
-  }, [])
+    markDraft()
+  }, [markDraft])
 
-  const addBlock = () => {
-    setData((d) => ({ ...d, body: [...d.body, defaultBlock()] }))
-  }
+  const addBlock = () => setData((d) => ({ ...d, body: [...d.body, defaultBlock()] }))
 
   const moveBlock = (idx: number, dir: 'up' | 'down') => {
     setData((d) => {
@@ -420,12 +443,51 @@ export function ArticleEditor({ onExit }: ArticleEditorProps) {
     }))
   }
 
-  const titleRef   = useAutoResize(data.title)
-  const subRef     = useAutoResize(data.subtitle)
+  const publish = async () => {
+    setPublishErr(null)
+    if (!data.title.trim()) {
+      setPublishErr('O título é obrigatório')
+      return
+    }
+    setPublishing(true)
+    try {
+      const payload = {
+        title:          data.title.trim(),
+        subtitle:       data.subtitle.trim() || null,
+        categoryId:     data.categoryId,
+        authorId:       data.authorId,
+        badgeId:        data.badgeId,
+        readingTimeMin: data.readingMin,
+        heroImage:      data.heroImage.trim() || null,
+        heroCaption:    data.heroCaption.trim() || null,
+        body:           toApiBlocks(data.body),
+        status:         'published' as const,
+      }
+      const res = articleId
+        ? await articlesApi.update(articleId, payload)
+        : await articlesApi.create(payload)
+      onPublished(res.id)
+    } catch (err) {
+      setPublishErr(err instanceof Error ? err.message : 'Erro ao publicar')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  const titleRef = useAutoResize(data.title)
+  const subRef   = useAutoResize(data.subtitle)
 
   const wordCount = data.body
     .filter((b): b is ParagraphBlock | HeadingBlock | PullquoteBlock => b.type !== 'image')
     .reduce((acc, b) => acc + b.text.split(/\s+/).filter(Boolean).length, 0)
+
+  const selectedAuthor = authors.find((a) => a.id === data.authorId) ?? null
+  const previewAuthor: Author | null = selectedAuthor
+    ?? (user ? ({
+          id: user.id, name: user.name, role: user.role,
+          avatarUrl: user.avatarUrl ?? `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=b8c9c0`,
+          avatarType: 'dicebear' as const, avatarCrop: null, createdAt: '',
+        }) : null)
 
   return (
     <div className={styles.editor}>
@@ -442,79 +504,115 @@ export function ArticleEditor({ onExit }: ArticleEditorProps) {
         <div className={styles.topCenter}>
           <span className={styles.topBrand}>Guandalini.</span>
           <span className={styles.topDivider}>/</span>
-          <span className={styles.topLabel}>Novo artigo</span>
+          <span className={styles.topLabel}>{articleId ? 'Editar artigo' : 'Novo artigo'}</span>
         </div>
 
         <div className={styles.topRight}>
           <span className={styles.saveStatus}>
-            {saved ? (
-              <>
-                <span className={styles.savedDot} />
-                Salvo automaticamente
-              </>
-            ) : (
-              <>
-                <span className={styles.unsavedDot} />
-                {wordCount > 0 ? `${wordCount} palavras` : 'Rascunho'}
-              </>
-            )}
+            {savedAt
+              ? <><span className={styles.savedDot} />Rascunho local ok</>
+              : <><span className={styles.unsavedDot} />{wordCount > 0 ? `${wordCount} palavras` : 'Rascunho'}</>}
           </span>
-          <button className={styles.publishBtn}>Publicar</button>
+          <button
+            className={styles.publishBtn}
+            onClick={publish}
+            disabled={publishing || !data.title.trim()}
+          >
+            {publishing ? 'Publicando…' : 'Publicar'}
+          </button>
         </div>
       </div>
 
-      {/* ── Panels ── */}
-      <div className={styles.panels}>
+      {publishErr && (
+        <div style={{
+          background: '#FEF0F0', color: '#C0392B',
+          border: '1px solid #F5CDC8', padding: '10px 20px',
+          fontSize: '0.8125rem',
+        }}>
+          {publishErr}
+        </div>
+      )}
 
-        {/* Left — Editor */}
+      <div className={styles.panels}>
+        {/* ── Left — Editor ── */}
         <div className={styles.panelLeft}>
           <div className={styles.editorInner}>
 
-            {/* Metadata fields */}
             <section className={styles.metaSection}>
               <h3 className={styles.sectionLabel}>Metadados</h3>
 
               <div className={styles.metaGrid}>
                 <div className={styles.fieldGroup}>
                   <label className={styles.fieldLabel}>Categoria</label>
-                  <input
-                    type="text"
+                  <select
                     className={styles.fieldInput}
-                    value={data.category}
-                    placeholder="ex: Inteligência Artificial"
-                    onChange={(e) => update('category', e.target.value)}
-                  />
+                    value={data.categoryId ?? ''}
+                    onChange={(e) => update('categoryId', e.target.value || null)}
+                  >
+                    <option value="">— Selecionar —</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className={styles.fieldGroup}>
                   <label className={styles.fieldLabel}>Tempo de leitura</label>
-                  <input
-                    type="text"
-                    className={styles.fieldInput}
-                    value={data.readingTime}
-                    placeholder="ex: 8 min de leitura"
-                    onChange={(e) => update('readingTime', e.target.value)}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={180}
+                      className={styles.fieldInput}
+                      value={data.readingMin}
+                      style={{ width: 100 }}
+                      onChange={(e) => {
+                        const n = Number(e.target.value)
+                        if (Number.isFinite(n)) update('readingMin', Math.max(1, Math.min(180, n)))
+                      }}
+                    />
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+                      → {formatReading(data.readingMin)}
+                    </span>
+                  </div>
                 </div>
                 <div className={styles.fieldGroup}>
                   <label className={styles.fieldLabel}>Badge de estilo</label>
-                  <input
-                    type="text"
+                  <select
                     className={styles.fieldInput}
-                    value={data.styleBadge}
-                    placeholder="ex: Deep Dive"
-                    onChange={(e) => update('styleBadge', e.target.value)}
-                  />
+                    value={data.badgeId ?? ''}
+                    onChange={(e) => update('badgeId', e.target.value || null)}
+                  >
+                    <option value="">— Selecionar —</option>
+                    {badges.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Autor</label>
+                  <select
+                    className={styles.fieldInput}
+                    value={data.authorId ?? ''}
+                    onChange={(e) => update('authorId', e.target.value || null)}
+                  >
+                    <option value="">
+                      {user ? `Eu (${user.name})` : '— Selecionar —'}
+                    </option>
+                    {authors.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name} — {a.role}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </section>
 
             <div className={styles.divider} />
 
-            {/* Title / Subtitle */}
             <section className={styles.titleSection}>
               <textarea
                 ref={titleRef}
                 value={data.title}
+                maxLength={200}
                 className={styles.titleInput}
                 placeholder="Título do artigo…"
                 rows={1}
@@ -523,6 +621,7 @@ export function ArticleEditor({ onExit }: ArticleEditorProps) {
               <textarea
                 ref={subRef}
                 value={data.subtitle}
+                maxLength={500}
                 className={styles.subtitleInput}
                 placeholder="Subtítulo ou lead do artigo…"
                 rows={2}
@@ -532,12 +631,12 @@ export function ArticleEditor({ onExit }: ArticleEditorProps) {
 
             <div className={styles.divider} />
 
-            {/* Hero image */}
             <section className={styles.metaSection}>
               <h3 className={styles.sectionLabel}>Imagem de capa</h3>
               <div className={styles.fieldGroup}>
                 <input
                   type="text"
+                  maxLength={1000}
                   className={styles.fieldInput}
                   value={data.heroImage}
                   placeholder="URL da imagem principal"
@@ -547,6 +646,7 @@ export function ArticleEditor({ onExit }: ArticleEditorProps) {
               <div className={styles.fieldGroup} style={{ marginTop: 8 }}>
                 <input
                   type="text"
+                  maxLength={500}
                   className={styles.fieldInput}
                   value={data.heroCaption}
                   placeholder="Legenda da imagem (opcional)"
@@ -557,7 +657,6 @@ export function ArticleEditor({ onExit }: ArticleEditorProps) {
 
             <div className={styles.divider} />
 
-            {/* Body blocks */}
             <section className={styles.bodySection}>
               <h3 className={styles.sectionLabel}>Conteúdo</h3>
 
@@ -583,14 +682,14 @@ export function ArticleEditor({ onExit }: ArticleEditorProps) {
           </div>
         </div>
 
-        {/* Right — Preview */}
+        {/* ── Right — Preview ── */}
         <div className={styles.panelRight}>
           <div className={styles.previewLabel}>
             <span className={styles.previewDot} />
             Pré-visualização ao vivo
           </div>
           <div className={styles.previewScroll}>
-            <Preview data={data} />
+            <Preview data={data} categories={categories} badges={badges} author={previewAuthor} />
           </div>
         </div>
       </div>
