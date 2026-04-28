@@ -1,51 +1,79 @@
-# Deploy na Hostinger VPS com Docker
+# Deploy na Hostinger VPS com Docker and Traefik
 
-Este projeto sobe completo via Docker Compose:
+Este projeto esta pronto para o template **Docker and Traefik** da Hostinger.
 
-- `web`: Nginx servindo o build React e fazendo proxy de `/api` e `/uploads`
+O stack de producao fica assim:
+
+- `web`: Nginx servindo o build React e fazendo proxy interno de `/api` e `/uploads`
 - `api`: Node/Express em modo production
 - `db`: Postgres privado na rede Docker
+- `traefik-proxy`: rede externa criada pelo projeto Traefik da Hostinger
 
-Somente o serviço `web` publica porta no host. API e banco não ficam expostos publicamente.
+Somente o Traefik publica `80`/`443` no host. Os containers `web`, `api` e `db` nao publicam portas diretamente.
 
-## Passos
+## 1. Antes de subir o blog
 
-1. Escolha o template **Docker** na VPS da Hostinger.
-2. Acesse a VPS por SSH.
-3. Clone o repositório.
-4. Crie o `.env` de produção:
+No painel da Hostinger, escolha **Docker and Traefik** e deixe o projeto Traefik padrao ativo.
+
+A Hostinger cria uma rede Docker externa chamada `traefik-proxy`. O `docker-compose.prod.yml` deste projeto entra nessa rede e usa labels para o Traefik descobrir o site.
+
+## 2. DNS
+
+Aponte o dominio ou subdominio para o IP da VPS.
+
+Exemplo:
+
+```txt
+blog.seudominio.com -> IP_DA_VPS
+```
+
+## 3. Variaveis de ambiente
+
+Na VPS, clone o repositorio e crie o `.env` real:
 
 ```sh
 cp .env.production.example .env
 ```
 
-5. Edite o `.env` com valores reais e fortes:
+Edite os valores:
 
 ```sh
-POSTGRES_PASSWORD=...
-ADMIN_EMAIL=...
-ADMIN_PASSWORD=...
-JWT_SECRET=...
-CORS_ORIGIN=https://seudominio.com
-WEB_PORT=80
-API_PORT=3001
+COMPOSE_PROJECT_NAME=guandalini
+APP_DOMAIN=blog.seudominio.com
+CORS_ORIGIN=https://blog.seudominio.com
+POSTGRES_PASSWORD=uma-senha-longa-e-randomica
+ADMIN_EMAIL=seu-email
+ADMIN_PASSWORD=uma-senha-admin-forte
+JWT_SECRET=um-segredo-com-mais-de-32-caracteres
 ```
 
-6. Suba o stack:
+## 4. Subir com Traefik
 
 ```sh
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-7. Verifique:
+Verifique:
 
 ```sh
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f web api
 ```
 
-## Domínio e HTTPS
+Depois acesse:
 
-Aponte o domínio para o IP da VPS. Para HTTPS, use o recurso de SSL/proxy da Hostinger, Cloudflare com proxy ativo, ou coloque um proxy TLS na VPS na frente deste Compose.
+```txt
+https://blog.seudominio.com
+```
 
-O container `web` fala HTTP na porta `80`; TLS deve terminar no proxy/serviço de borda.
+O certificado SSL deve ser emitido e renovado pelo Traefik/Let's Encrypt.
+
+## 5. Modo sem Traefik
+
+Use somente se escolher o template Docker simples, sem Traefik:
+
+```sh
+docker compose -f docker-compose.standalone.yml up -d --build
+```
+
+Nesse modo, o container `web` publica `${WEB_PORT:-80}:80` direto no host e voce precisa resolver HTTPS por fora.
