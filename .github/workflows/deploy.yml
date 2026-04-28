@@ -22,6 +22,7 @@ jobs:
       APP_DIR: /opt/guandalini-blog
       APP_DOMAIN: ${{ vars.APP_DOMAIN || 'guandalini.177.7.40.187.sslip.io' }}
       COMPOSE_PROJECT_NAME: guandalini
+      TRAEFIK_NETWORK: ${{ vars.TRAEFIK_NETWORK || '' }}
       HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
       HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
 
@@ -86,8 +87,8 @@ jobs:
         run: |
           set -euo pipefail
           SSH_PORT="${HOSTINGER_SSH_PORT:-22}"
-          REMOTE_ENV=$(printf 'APP_DIR=%q TARGET_SHA=%q APP_DOMAIN=%q COMPOSE_PROJECT_NAME=%q SYNCED_SOURCE=1' \
-            "${APP_DIR}" "${GITHUB_SHA}" "${APP_DOMAIN}" "${COMPOSE_PROJECT_NAME}")
+          REMOTE_ENV=$(printf 'APP_DIR=%q TARGET_SHA=%q APP_DOMAIN=%q COMPOSE_PROJECT_NAME=%q TRAEFIK_NETWORK=%q SYNCED_SOURCE=1' \
+            "${APP_DIR}" "${GITHUB_SHA}" "${APP_DOMAIN}" "${COMPOSE_PROJECT_NAME}" "${TRAEFIK_NETWORK}")
           REMOTE_SCRIPT=$(printf '%q/scripts/hostinger-deploy.sh' "${APP_DIR}")
 
           ssh -p "${SSH_PORT}" \

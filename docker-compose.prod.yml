@@ -10,7 +10,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-proxy"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-proxy}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-guandalini}.rule=Host(`${APP_DOMAIN:?Set APP_DOMAIN in .env}`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-guandalini}.entrypoints=websecure"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-guandalini}.tls.certresolver=letsencrypt"
@@ -75,4 +75,5 @@ volumes:
 
 networks:
   traefik-proxy:
+    name: ${TRAEFIK_NETWORK:-traefik-proxy}
     external: true

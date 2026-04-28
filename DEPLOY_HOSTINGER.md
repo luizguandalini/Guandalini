@@ -15,7 +15,7 @@ Somente o Traefik publica `80`/`443` no host. Os containers `web`, `api` e `db` 
 
 No painel da Hostinger, escolha **Docker and Traefik** e deixe o projeto Traefik padrao ativo.
 
-A Hostinger cria uma rede Docker externa chamada `traefik-proxy`. O `docker-compose.prod.yml` deste projeto entra nessa rede e usa labels para o Traefik descobrir o site.
+A Hostinger costuma criar uma rede Docker externa para o Traefik. O script de deploy tenta detectar essa rede automaticamente; se voce quiser forcar um nome especifico, defina a variavel de repositorio `TRAEFIK_NETWORK` no GitHub.
 
 ## 2. DNS
 
@@ -117,6 +117,12 @@ HOSTINGER_SSH_PORT
 ```
 
 Se voce definir uma variavel de repositorio chamada `APP_DOMAIN`, ela substitui o dominio padrao `guandalini.177.7.40.187.sslip.io`.
+
+Se a rede do Traefik tiver um nome especifico na VPS, defina tambem a variavel de repositorio:
+
+```txt
+TRAEFIK_NETWORK
+```
 
 ## 6. Modo sem Traefik
 

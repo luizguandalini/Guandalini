@@ -6,6 +6,7 @@ REPO_URL="${REPO_URL:-https://github.com/luizguandalini/Guandalini.git}"
 TARGET_SHA="${TARGET_SHA:-main}"
 APP_DOMAIN="${APP_DOMAIN:-guandalini.177.7.40.187.sslip.io}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-guandalini}"
+TRAEFIK_NETWORK="${TRAEFIK_NETWORK:-}"
 SYNCED_SOURCE="${SYNCED_SOURCE:-0}"
 ENV_FILE="$APP_DIR/.env"
 SECRETS_DIR="$APP_DIR/.deploy"
@@ -28,6 +29,30 @@ random_hex() {
   fi
 }
 
+detect_traefik_network() {
+  if [ -n "$TRAEFIK_NETWORK" ] && docker network inspect "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
+    echo "$TRAEFIK_NETWORK"
+    return 0
+  fi
+
+  if docker network inspect traefik-proxy >/dev/null 2>&1; then
+    echo "traefik-proxy"
+    return 0
+  fi
+
+  for container_id in $(docker ps --format '{{.ID}}'); do
+    container_meta="$(docker inspect -f '{{.Name}} {{.Config.Image}} {{index .Config.Labels "com.docker.compose.service"}} {{index .Config.Labels "com.docker.compose.project"}}' "$container_id" 2>/dev/null || true)"
+    if printf '%s' "$container_meta" | tr '[:upper:]' '[:lower:]' | grep -q 'traefik'; then
+      docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' "$container_id" |
+        grep -v -E '^(bridge|host|none)$' |
+        head -n 1
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 need docker
 
 if docker compose version >/dev/null 2>&1; then
@@ -39,11 +64,16 @@ else
   exit 1
 fi
 
-if ! docker network inspect traefik-proxy >/dev/null 2>&1; then
-  echo "Docker network 'traefik-proxy' was not found." >&2
+TRAEFIK_NETWORK="$(detect_traefik_network || true)"
+if [ -z "$TRAEFIK_NETWORK" ]; then
+  echo "Could not find a Docker network attached to Traefik." >&2
   echo "Deploy the Hostinger Docker and Traefik template before deploying this app." >&2
+  echo "Existing Docker networks:" >&2
+  docker network ls >&2 || true
   exit 1
 fi
+export TRAEFIK_NETWORK
+echo "Using Traefik network: $TRAEFIK_NETWORK"
 
 if [ "$SYNCED_SOURCE" = "1" ]; then
   cd "$APP_DIR"
