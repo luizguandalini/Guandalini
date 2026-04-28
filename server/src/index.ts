@@ -38,7 +38,6 @@ async function main() {
     : { origin: true }
 
   app.use(cors(corsOptions))
-  app.use(express.json({ limit: '2mb' }))
   app.use('/api', rateLimit({
     windowMs: 60 * 1000,
     max: config.nodeEnv === 'production' ? 120 : 600,
@@ -46,6 +45,7 @@ async function main() {
     legacyHeaders: false,
     message: { error: 'Muitas requisicoes. Tente novamente em instantes.' },
   }))
+  app.use(express.json({ limit: '2mb' }))
 
   app.use('/uploads', express.static(join(__dirname, '..', config.uploadsDir), {
     immutable: true,

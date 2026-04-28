@@ -3,7 +3,7 @@ import { unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { query } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
-import { uploadAvatar } from '../middleware/upload.js'
+import { uploadAvatar, verifyUploadedImage } from '../middleware/upload.js'
 import {
   LIMITS,
   httpError,
@@ -96,7 +96,7 @@ authorsRouter.get('/', async (req, res) => {
 })
 
 // ── Create (multipart with optional avatar upload) ────
-authorsRouter.post('/', uploadAvatar.single('avatar'), async (req, res) => {
+authorsRouter.post('/', uploadAvatar.single('avatar'), verifyUploadedImage, async (req, res) => {
   try {
     const name = requireString(req.body?.name, 'name', LIMITS.name)
     const role = requireString(req.body?.role, 'role', LIMITS.role)
@@ -135,7 +135,7 @@ authorsRouter.post('/', uploadAvatar.single('avatar'), async (req, res) => {
 })
 
 // ── Update ────────────────────────────────────────────
-authorsRouter.patch('/:id', uploadAvatar.single('avatar'), async (req, res) => {
+authorsRouter.patch('/:id', uploadAvatar.single('avatar'), verifyUploadedImage, async (req, res) => {
   try {
     const id = requireUuid(req.params.id, 'id')
 
