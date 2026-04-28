@@ -19,7 +19,15 @@ A Hostinger cria uma rede Docker externa chamada `traefik-proxy`. O `docker-comp
 
 ## 2. DNS
 
-Aponte o dominio ou subdominio para o IP da VPS.
+Voce pode usar um dominio seu ou o dominio automatico `sslip.io`.
+
+Padrao ja configurado:
+
+```txt
+guandalini.177.7.40.187.sslip.io -> 177.7.40.187
+```
+
+Se quiser usar dominio proprio, aponte o dominio/subdominio para o IP da VPS.
 
 Exemplo:
 
@@ -29,7 +37,9 @@ blog.seudominio.com -> IP_DA_VPS
 
 ## 3. Variaveis de ambiente
 
-Na VPS, clone o repositorio e crie o `.env` real:
+No deploy automatico, o script `scripts/hostinger-deploy.sh` cria o `.env` real na VPS se ele ainda nao existir.
+
+Para deploy manual, crie o `.env` assim:
 
 ```sh
 cp .env.production.example .env
@@ -39,8 +49,8 @@ Edite os valores:
 
 ```sh
 COMPOSE_PROJECT_NAME=guandalini
-APP_DOMAIN=blog.seudominio.com
-CORS_ORIGIN=https://blog.seudominio.com
+APP_DOMAIN=guandalini.177.7.40.187.sslip.io
+CORS_ORIGIN=https://guandalini.177.7.40.187.sslip.io
 POSTGRES_PASSWORD=uma-senha-longa-e-randomica
 ADMIN_EMAIL=seu-email
 ADMIN_PASSWORD=uma-senha-admin-forte
@@ -68,7 +78,47 @@ https://blog.seudominio.com
 
 O certificado SSL deve ser emitido e renovado pelo Traefik/Let's Encrypt.
 
-## 5. Modo sem Traefik
+## 5. Deploy automatico pelo GitHub Actions
+
+O workflow `.github/workflows/deploy.yml` roda em todo push na branch `main`.
+
+Ele faz SSH na VPS, envia o checkout atual do GitHub para `/opt/guandalini-blog`, cria o `.env` de producao automaticamente na primeira execucao e sobe:
+
+```sh
+docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+```
+
+O `.env` criado na VPS usa senhas fortes aleatorias para:
+
+- `POSTGRES_PASSWORD`
+- `ADMIN_PASSWORD`
+- `JWT_SECRET`
+
+A credencial inicial do admin fica salva apenas na VPS:
+
+```txt
+/opt/guandalini-blog/.deploy/initial-admin.txt
+```
+
+Permissao esperada: `600`.
+
+### Segredo necessario no GitHub
+
+Para o GitHub conseguir entrar na VPS, o repositorio precisa ter este secret:
+
+```txt
+HOSTINGER_SSH_PRIVATE_KEY
+```
+
+Opcional:
+
+```txt
+HOSTINGER_SSH_PORT
+```
+
+Se voce definir uma variavel de repositorio chamada `APP_DOMAIN`, ela substitui o dominio padrao `guandalini.177.7.40.187.sslip.io`.
+
+## 6. Modo sem Traefik
 
 Use somente se escolher o template Docker simples, sem Traefik:
 

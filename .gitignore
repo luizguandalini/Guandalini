@@ -28,7 +28,11 @@ Thumbs.db
 # Env
 .env
 .env.local
+.env.development
+.env.production
+.env.staging
 .env.*.local
+.deploy/
 
 # Uploads
 server/uploads/*

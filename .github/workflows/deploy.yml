@@ -1,0 +1,98 @@
+name: Deploy to Hostinger VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: hostinger-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      VPS_HOST: 177.7.40.187
+      VPS_USER: root
+      APP_DIR: /opt/guandalini-blog
+      APP_DOMAIN: ${{ vars.APP_DOMAIN || 'guandalini.177.7.40.187.sslip.io' }}
+      COMPOSE_PROJECT_NAME: guandalini
+      HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+      HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${HOSTINGER_SSH_PRIVATE_KEY}" ]; then
+            echo "::error::Missing GitHub secret HOSTINGER_SSH_PRIVATE_KEY"
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${HOSTINGER_SSH_PRIVATE_KEY}" > ~/.ssh/hostinger_deploy_key
+          chmod 600 ~/.ssh/hostinger_deploy_key
+
+          SSH_PORT="${HOSTINGER_SSH_PORT:-22}"
+          ssh-keyscan -T 15 -p "${SSH_PORT}" -H "${VPS_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Upload source to VPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_PORT="${HOSTINGER_SSH_PORT:-22}"
+          REMOTE_ENV=$(printf 'APP_DIR=%q' "${APP_DIR}")
+
+          tar \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='server/node_modules' \
+            --exclude='dist' \
+            --exclude='dist-ssr' \
+            --exclude='server/dist' \
+            --exclude='.deploy' \
+            --exclude='.env' \
+            --exclude='.env.local' \
+            --exclude='.env.development' \
+            --exclude='.env.production' \
+            --exclude='.env.staging' \
+            --exclude='.env.*.local' \
+            --exclude='server/uploads/*' \
+            -czf - . | ssh -p "${SSH_PORT}" \
+              -i ~/.ssh/hostinger_deploy_key \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              "${VPS_USER}@${VPS_HOST}" \
+              "${REMOTE_ENV} sh -c '
+                set -eu
+                case \"\$APP_DIR\" in \"\"|\"/\"|\"/root\"|\"/opt\") echo \"Unsafe APP_DIR: \$APP_DIR\" >&2; exit 1;; esac
+                mkdir -p \"\$APP_DIR\"
+                find \"\$APP_DIR\" -mindepth 1 -maxdepth 1 ! -name .env ! -name .deploy -exec rm -rf {} +
+                tar -xzf - -C \"\$APP_DIR\"
+              '"
+
+      - name: Deploy on VPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_PORT="${HOSTINGER_SSH_PORT:-22}"
+          REMOTE_ENV=$(printf 'APP_DIR=%q TARGET_SHA=%q APP_DOMAIN=%q COMPOSE_PROJECT_NAME=%q SYNCED_SOURCE=1' \
+            "${APP_DIR}" "${GITHUB_SHA}" "${APP_DOMAIN}" "${COMPOSE_PROJECT_NAME}")
+          REMOTE_SCRIPT=$(printf '%q/scripts/hostinger-deploy.sh' "${APP_DIR}")
+
+          ssh -p "${SSH_PORT}" \
+            -i ~/.ssh/hostinger_deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "${VPS_USER}@${VPS_HOST}" \
+            "${REMOTE_ENV} sh ${REMOTE_SCRIPT}"
