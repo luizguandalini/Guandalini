@@ -6,9 +6,24 @@ function required(name: string): string {
   return v
 }
 
+function optionalList(name: string): string[] {
+  return (process.env[name] ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+}
+
+function assertSecret(name: string, value: string, minLength = 32): string {
+  if ((process.env.NODE_ENV ?? 'development') === 'production' && value.length < minLength) {
+    throw new Error(`${name} must be at least ${minLength} characters in production`)
+  }
+  return value
+}
+
 export const config = {
   port: Number(process.env.API_PORT ?? 3001),
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  corsOrigins: optionalList('CORS_ORIGIN'),
 
   db: {
     host:     process.env.POSTGRES_HOST     ?? 'localhost',
@@ -26,7 +41,7 @@ export const config = {
   },
 
   jwt: {
-    secret:    required('JWT_SECRET'),
+    secret:    assertSecret('JWT_SECRET', required('JWT_SECRET')),
     expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   },
 

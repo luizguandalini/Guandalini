@@ -1,20 +1,20 @@
 import { Router } from 'express'
 import { query } from '../db.js'
-import { requireAuth } from '../middleware/auth.js'
+import { optionalAuth, requireAuth } from '../middleware/auth.js'
 import {
   LIMITS,
   httpError,
   isHttpError,
   optionalString,
+  optionalUrl,
   optionalUuid,
   requireInt,
   requireString,
+  requireUuid,
   sanitizeBody,
 } from '../middleware/validate.js'
 
 export const articlesRouter = Router()
-
-articlesRouter.use(requireAuth)
 
 const PIN_POSITIONS = ['left', 'right_top', 'right_bottom'] as const
 type PinPosition = typeof PIN_POSITIONS[number]
@@ -94,8 +94,10 @@ function toDto(r: JoinedRow) {
 // ── List: pinned (separately) + recent (paginated) ──
 articlesRouter.get('/', async (req, res) => {
   try {
-    const page   = Math.max(1, Number(req.query.page  ?? 1))
-    const limit  = Math.min(30, Math.max(1, Number(req.query.limit ?? 9)))
+    const rawPage  = Number(req.query.page ?? 1)
+    const rawLimit = Number(req.query.limit ?? 9)
+    const page     = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
+    const limit    = Number.isInteger(rawLimit) ? Math.min(30, Math.max(1, rawLimit)) : 9
     const offset = (page - 1) * limit
 
     const { rows: pinned } = await query<JoinedRow>(
@@ -140,11 +142,13 @@ articlesRouter.get('/', async (req, res) => {
 })
 
 // ── Get one by id ────────────────────────────────────
-articlesRouter.get('/:id', async (req, res) => {
+articlesRouter.get('/:id', optionalAuth, async (req, res) => {
   try {
+    const id = requireUuid(req.params.id, 'id')
     const { rows } = await query<JoinedRow>(
-      `SELECT ${JOIN_SELECT} ${JOIN_FROM} WHERE a.id = $1`,
-      [req.params.id],
+      `SELECT ${JOIN_SELECT} ${JOIN_FROM}
+       WHERE a.id = $1 AND (a.status = 'published' OR $2::boolean)`,
+      [id, Boolean(req.user)],
     )
     if (!rows[0]) throw httpError(404, 'Artigo não encontrado')
     res.json(toDto(rows[0]))
@@ -159,11 +163,11 @@ articlesRouter.get('/:id', async (req, res) => {
 })
 
 // ── Create ───────────────────────────────────────────
-articlesRouter.post('/', async (req, res) => {
+articlesRouter.post('/', requireAuth, async (req, res) => {
   try {
     const title       = requireString(req.body?.title,    'title',    LIMITS.title)
     const subtitle    = optionalString(req.body?.subtitle,            LIMITS.subtitle)
-    const heroImage   = optionalString(req.body?.heroImage,           LIMITS.heroImage)
+    const heroImage   = optionalUrl(req.body?.heroImage,              LIMITS.heroImage)
     const heroCaption = optionalString(req.body?.heroCaption,         LIMITS.heroCaption)
     const categoryId  = optionalUuid(req.body?.categoryId, 'categoryId')
     const authorId    = optionalUuid(req.body?.authorId,   'authorId')
@@ -204,9 +208,9 @@ articlesRouter.post('/', async (req, res) => {
 })
 
 // ── Update ───────────────────────────────────────────
-articlesRouter.patch('/:id', async (req, res) => {
+articlesRouter.patch('/:id', requireAuth, async (req, res) => {
   try {
-    const id = req.params.id
+    const id = requireUuid(req.params.id, 'id')
     const { rows: existing } = await query<JoinedRow>(
       `SELECT ${JOIN_SELECT} ${JOIN_FROM} WHERE a.id = $1`,
       [id],
@@ -216,7 +220,7 @@ articlesRouter.patch('/:id', async (req, res) => {
 
     const title     = req.body?.title     !== undefined ? requireString(req.body.title,  'title', LIMITS.title)  : current.title
     const subtitle  = req.body?.subtitle  !== undefined ? optionalString(req.body.subtitle, LIMITS.subtitle)     : current.subtitle
-    const heroImage = req.body?.heroImage !== undefined ? optionalString(req.body.heroImage, LIMITS.heroImage)   : current.hero_image
+    const heroImage = req.body?.heroImage !== undefined ? optionalUrl(req.body.heroImage, LIMITS.heroImage)       : current.hero_image
     const heroCaption = req.body?.heroCaption !== undefined ? optionalString(req.body.heroCaption, LIMITS.heroCaption) : current.hero_caption
     const categoryId = req.body?.categoryId !== undefined ? optionalUuid(req.body.categoryId, 'categoryId') : current.category_id
     const authorId   = req.body?.authorId   !== undefined ? optionalUuid(req.body.authorId,   'authorId')   : current.author_id
@@ -261,9 +265,9 @@ articlesRouter.patch('/:id', async (req, res) => {
 })
 
 // ── Pin / unpin ──────────────────────────────────────
-articlesRouter.patch('/:id/pin', async (req, res) => {
+articlesRouter.patch('/:id/pin', requireAuth, async (req, res) => {
   try {
-    const id = req.params.id
+    const id = requireUuid(req.params.id, 'id')
     const raw = req.body?.position
     let position: PinPosition | null = null
 
@@ -305,9 +309,10 @@ articlesRouter.patch('/:id/pin', async (req, res) => {
 })
 
 // ── Delete ───────────────────────────────────────────
-articlesRouter.delete('/:id', async (req, res) => {
+articlesRouter.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const { rowCount } = await query('DELETE FROM articles WHERE id = $1', [req.params.id])
+    const id = requireUuid(req.params.id, 'id')
+    const { rowCount } = await query('DELETE FROM articles WHERE id = $1', [id])
     if (!rowCount) throw httpError(404, 'Artigo não encontrado')
     res.json({ ok: true })
   } catch (err) {

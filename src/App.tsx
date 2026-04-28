@@ -16,13 +16,16 @@ type Page =
   | { name: 'article'; id: string }
   | { name: 'editor';  id?: string }
   | { name: 'admin';   tab: AdminTab }
+  | { name: 'login' }
 
 export default function App() {
   const { user, loading } = useAuth()
   const [page, setPage] = useState<Page>({ name: 'home' })
+  const go = (p: Page) => setPage(p)
+  const protectedPage = page.name === 'editor' || page.name === 'admin'
 
   // ── Global splash while we check the token ──
-  if (loading) {
+  if (loading && protectedPage) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex',
@@ -37,12 +40,13 @@ export default function App() {
   }
 
   // ── Not authenticated → login screen ──
-  if (!user) {
+  if (protectedPage && !user) {
     return <LoginPage />
   }
 
-  // ── Authenticated routes ──
-  const go = (p: Page) => setPage(p)
+  if (page.name === 'login') {
+    return <LoginPage onSuccess={() => go({ name: 'home' })} />
+  }
 
   // Editor is full-screen (no navbar/footer)
   if (page.name === 'editor') {
@@ -61,6 +65,7 @@ export default function App() {
         onLogoClick={() => go({ name: 'home' })}
         onWriteClick={() => go({ name: 'editor' })}
         onAdminClick={() => go({ name: 'admin', tab: 'authors' })}
+        onLoginClick={() => go({ name: 'login' })}
       />
 
       {page.name === 'home' && (

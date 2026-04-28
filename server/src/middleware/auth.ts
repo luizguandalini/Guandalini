@@ -25,11 +25,33 @@ export function signToken(payload: AuthPayload): string {
   )
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+function tokenFromHeader(req: Request): string | null {
   const header = req.header('Authorization') ?? ''
   const [scheme, token] = header.split(' ')
 
-  if (scheme !== 'Bearer' || !token) {
+  if (scheme !== 'Bearer' || !token) return null
+  return token
+}
+
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+  const token = tokenFromHeader(req)
+  if (!token) {
+    next()
+    return
+  }
+
+  try {
+    req.user = jwt.verify(token, config.jwt.secret) as AuthPayload
+  } catch {
+    req.user = undefined
+  }
+  next()
+}
+
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  const token = tokenFromHeader(req)
+
+  if (!token) {
     res.status(401).json({ error: 'Missing or invalid authorization header' })
     return
   }

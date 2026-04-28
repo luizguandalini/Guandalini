@@ -1,5 +1,7 @@
 import express from 'express'
-import cors from 'cors'
+import cors, { type CorsOptions } from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -7,6 +9,7 @@ import { config } from './config.js'
 import { waitForDb } from './db.js'
 import { runMigrations } from './migrate.js'
 import { seedAdmin } from './seed.js'
+import { isHttpError } from './middleware/validate.js'
 
 import { authRouter } from './routes/auth.js'
 import { authorsRouter } from './routes/authors.js'
@@ -22,10 +25,32 @@ async function main() {
   await seedAdmin()
 
   const app = express()
-  app.use(cors())
-  app.use(express.json({ limit: '2mb' }))
+  if (config.nodeEnv === 'production') {
+    app.set('trust proxy', 1)
+  }
 
-  app.use('/uploads', express.static(join(__dirname, '..', config.uploadsDir)))
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }))
+
+  const corsOptions: CorsOptions = config.nodeEnv === 'production'
+    ? { origin: config.corsOrigins.length > 0 ? config.corsOrigins : false }
+    : { origin: true }
+
+  app.use(cors(corsOptions))
+  app.use(express.json({ limit: '2mb' }))
+  app.use('/api', rateLimit({
+    windowMs: 60 * 1000,
+    max: config.nodeEnv === 'production' ? 120 : 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitas requisicoes. Tente novamente em instantes.' },
+  }))
+
+  app.use('/uploads', express.static(join(__dirname, '..', config.uploadsDir), {
+    immutable: true,
+    maxAge: '7d',
+  }))
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
@@ -37,9 +62,14 @@ async function main() {
 
   app.use((_req, res) => res.status(404).json({ error: 'Not found' }))
 
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    void _next
     console.error('[error]', err)
-    res.status(500).json({ error: err.message ?? 'Internal server error' })
+    const status = isHttpError(err) ? err.statusCode : 500
+    const fallback = status >= 500 && config.nodeEnv === 'production'
+      ? 'Internal server error'
+      : err instanceof Error ? err.message : 'Internal server error'
+    res.status(status).json({ error: fallback })
   })
 
   app.listen(config.port, () => {

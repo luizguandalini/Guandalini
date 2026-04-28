@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, type MutableRefObject } from 'react'
 import styles from './ArticleEditor.module.css'
 import { articlesApi, authorsApi, badgesApi, categoriesApi } from '../api'
 import type {
-  Article,
   ArticleBlock,
   Author,
   Badge,
@@ -10,6 +9,7 @@ import type {
 } from '../types'
 import { useAuth } from '../auth'
 import { Avatar } from './Avatar'
+import { insertMarkdownLink, renderRichText } from '../richText'
 
 // ── Block types with local IDs (for drag / delete keys) ──────────────
 
@@ -63,7 +63,12 @@ function toLocalBlocks(blocks: ArticleBlock[]): Block[] {
 }
 
 function toApiBlocks(blocks: Block[]): ArticleBlock[] {
-  return blocks.map(({ id: _id, ...rest }) => rest as ArticleBlock)
+  return blocks.map((block) => {
+    if (block.type === 'image') {
+      return { type: block.type, src: block.src, caption: block.caption }
+    }
+    return { type: block.type, text: block.text }
+  })
 }
 
 // ── Auto-resize textarea hook ────────────────────────────────────────
@@ -80,14 +85,23 @@ function useAutoResize(value: string) {
 }
 
 function AutoTextarea({
-  value, onChange, placeholder, className,
+  value, onChange, placeholder, className, inputRef,
 }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   className?: string
+  inputRef?: MutableRefObject<HTMLInputElement | HTMLTextAreaElement | null>
 }) {
   const ref = useAutoResize(value)
+  useEffect(() => {
+    if (!inputRef) return
+    inputRef.current = ref.current
+    return () => {
+      inputRef.current = null
+    }
+  }, [inputRef, ref])
+
   return (
     <textarea
       ref={ref}
@@ -112,6 +126,8 @@ function BlockRow({
   onMove: (dir: 'up' | 'down') => void
   onDelete: () => void
 }) {
+  const textFieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
+
   const changeType = (type: BlockType) => {
     if (type === 'image') {
       onChange({ id: block.id, type: 'image', src: '', caption: '' })
@@ -119,6 +135,36 @@ function BlockRow({
       const text = block.type !== 'image' ? block.text : ''
       onChange({ id: block.id, type, text } as Block)
     }
+  }
+
+  const applyLink = () => {
+    if (block.type === 'image') return
+
+    const field = textFieldRef.current
+    const start = field?.selectionStart ?? 0
+    const end = field?.selectionEnd ?? 0
+
+    if (start === end) {
+      alert('Selecione o texto que deseja transformar em link.')
+      field?.focus()
+      return
+    }
+
+    const rawUrl = prompt('URL do link')
+    if (rawUrl === null) return
+
+    const result = insertMarkdownLink(block.text, start, end, rawUrl)
+    if (!result) {
+      alert('Informe uma URL valida, como https://exemplo.com.')
+      field?.focus()
+      return
+    }
+
+    onChange({ ...block, text: result.text } as Block)
+    window.setTimeout(() => {
+      field?.focus()
+      field?.setSelectionRange(result.selectionStart, result.selectionEnd)
+    })
   }
 
   return (
@@ -134,6 +180,9 @@ function BlockRow({
           ))}
         </select>
         <div className={styles.blockActions}>
+          {block.type !== 'image' && (
+            <button className={styles.actionBtn} onClick={applyLink} title="Inserir link no texto selecionado">ln</button>
+          )}
           <button className={styles.actionBtn} onClick={() => onMove('up')} disabled={isFirst} title="Mover para cima">↑</button>
           <button className={styles.actionBtn} onClick={() => onMove('down')} disabled={isLast} title="Mover para baixo">↓</button>
           <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={onDelete} title="Remover">✕</button>
@@ -162,6 +211,7 @@ function BlockRow({
           </>
         ) : block.type === 'heading' ? (
           <input
+            ref={textFieldRef as MutableRefObject<HTMLInputElement | null>}
             type="text"
             maxLength={200}
             className={`${styles.fieldInput} ${styles.headingInput}`}
@@ -175,6 +225,7 @@ function BlockRow({
             onChange={(text) => onChange({ ...block, text } as Block)}
             placeholder={block.type === 'pullquote' ? '"Uma frase de destaque…"' : 'Escreva o parágrafo…'}
             className={`${styles.fieldTextarea} ${block.type === 'pullquote' ? styles.pullquoteTextarea : ''}`}
+            inputRef={textFieldRef}
           />
         )}
       </div>
@@ -310,11 +361,11 @@ function Preview({ data, categories, badges, author }: PreviewProps) {
       <div className={styles.previewBody}>
         {data.body.map((block) => {
           if (block.type === 'paragraph')
-            return <p key={block.id} className={`${styles.previewParagraph}${g(!!block.text)}`}>{block.text || BLOCK_PLACEHOLDERS.paragraph}</p>
+            return <p key={block.id} className={`${styles.previewParagraph}${g(!!block.text)}`}>{block.text ? renderRichText(block.text) : BLOCK_PLACEHOLDERS.paragraph}</p>
           if (block.type === 'heading')
-            return <h2 key={block.id} className={`${styles.previewHeading}${g(!!block.text)}`}>{block.text || BLOCK_PLACEHOLDERS.heading}</h2>
+            return <h2 key={block.id} className={`${styles.previewHeading}${g(!!block.text)}`}>{block.text ? renderRichText(block.text) : BLOCK_PLACEHOLDERS.heading}</h2>
           if (block.type === 'pullquote')
-            return <blockquote key={block.id} className={`${styles.previewPullquote}${g(!!block.text)}`}>{block.text || BLOCK_PLACEHOLDERS.pullquote}</blockquote>
+            return <blockquote key={block.id} className={`${styles.previewPullquote}${g(!!block.text)}`}>{block.text ? renderRichText(block.text) : BLOCK_PLACEHOLDERS.pullquote}</blockquote>
           if (block.type === 'image')
             return (
               <figure key={block.id} className={styles.previewFig}>

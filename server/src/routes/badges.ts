@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { query } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
-import { LIMITS, httpError, isHttpError, requireString } from '../middleware/validate.js'
+import { LIMITS, httpError, isHttpError, requireString, requireUuid } from '../middleware/validate.js'
 
 export const badgesRouter = Router()
 
@@ -46,7 +46,7 @@ badgesRouter.post('/', async (req, res) => {
 
 badgesRouter.patch('/:id', async (req, res) => {
   try {
-    const id = req.params.id
+    const id = requireUuid(req.params.id, 'id')
     const name = requireString(req.body?.name, 'name', LIMITS.badgeName)
     const { rows } = await query<BadgeRow>(
       `UPDATE badges SET name = $1 WHERE id = $2
@@ -69,7 +69,8 @@ badgesRouter.patch('/:id', async (req, res) => {
 
 badgesRouter.delete('/:id', async (req, res) => {
   try {
-    const { rowCount } = await query('DELETE FROM badges WHERE id = $1', [req.params.id])
+    const id = requireUuid(req.params.id, 'id')
+    const { rowCount } = await query('DELETE FROM badges WHERE id = $1', [id])
     if (!rowCount) throw httpError(404, 'Badge não encontrada')
     res.json({ ok: true })
   } catch (err) {

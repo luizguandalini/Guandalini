@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { useAuth } from '../auth'
 import styles from './LoginPage.module.css'
 
-export function LoginPage() {
+interface LoginPageProps {
+  onSuccess?: () => void
+}
+
+export function LoginPage({ onSuccess }: LoginPageProps) {
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -15,6 +19,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       await login(email.trim(), password)
+      onSuccess?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao entrar')
     } finally {

@@ -327,6 +327,15 @@
   line-height: 1.6;
 }
 
+.paragraph a,
+.sectionHeading a,
+.pullquote a {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent-sage);
+  text-underline-offset: 4px;
+}
+
 .inlineFigure {
   margin: 40px 0;
 }

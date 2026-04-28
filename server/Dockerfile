@@ -31,17 +31,28 @@ CMD ["npm", "run", "dev"]
 # ──────────────────────────────────────────────
 # Prod image (for later `docker build --target prod`)
 # ──────────────────────────────────────────────
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY . .
+RUN npm run build \
+ && cp -R src/migrations dist/migrations
+
 FROM node:22-alpine AS prod
 
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
-COPY . .
+COPY --from=build /app/dist ./dist
 RUN mkdir -p uploads
 
 ENV NODE_ENV=production
 EXPOSE 3001
 
-CMD ["npx", "tsx", "src/index.ts"]
+CMD ["node", "dist/index.js"]

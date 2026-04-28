@@ -9,6 +9,7 @@ import {
   httpError,
   isHttpError,
   requireString,
+  requireUuid,
   sanitizeText,
 } from '../middleware/validate.js'
 import { config } from '../config.js'
@@ -36,6 +37,30 @@ function toDto(r: AuthorRow) {
     avatarType: r.avatar_type,
     avatarCrop: r.avatar_crop ?? null,
     createdAt:  r.created_at,
+  }
+}
+
+function parseAvatarCrop(input: unknown): { x: number; y: number; scale: number } | null {
+  if (input === null || input === undefined || input === '') return null
+
+  try {
+    const parsed = typeof input === 'string' ? JSON.parse(input) : input
+    if (!parsed || typeof parsed !== 'object') return null
+
+    const raw = parsed as Record<string, unknown>
+    const x = Number(raw.x)
+    const y = Number(raw.y)
+    const scale = Number(raw.scale)
+
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(scale)) return null
+
+    return {
+      x: Math.max(-160, Math.min(160, x)),
+      y: Math.max(-160, Math.min(160, y)),
+      scale: Math.max(1, Math.min(3, scale)),
+    }
+  } catch {
+    return null
   }
 }
 
@@ -84,12 +109,7 @@ authorsRouter.post('/', uploadAvatar.single('avatar'), async (req, res) => {
       avatarUrl  = `/uploads/${req.file.filename}`
       avatarType = 'upload'
 
-      if (typeof req.body?.avatarCrop === 'string' && req.body.avatarCrop) {
-        try {
-          const parsed = JSON.parse(req.body.avatarCrop)
-          if (parsed && typeof parsed === 'object') avatarCrop = parsed
-        } catch { /* ignore malformed crop */ }
-      }
+      avatarCrop = parseAvatarCrop(req.body?.avatarCrop)
     } else {
       const dicebearSeed = sanitizeText(req.body?.dicebearSeed ?? name, LIMITS.name)
       avatarUrl  = `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(dicebearSeed)}&backgroundColor=b8c9c0`
@@ -117,7 +137,7 @@ authorsRouter.post('/', uploadAvatar.single('avatar'), async (req, res) => {
 // ── Update ────────────────────────────────────────────
 authorsRouter.patch('/:id', uploadAvatar.single('avatar'), async (req, res) => {
   try {
-    const id = req.params.id
+    const id = requireUuid(req.params.id, 'id')
 
     const { rows: existing } = await query<AuthorRow>(
       'SELECT id, name, role, avatar_url, avatar_type, avatar_crop, created_at FROM authors WHERE id = $1',
@@ -142,12 +162,7 @@ authorsRouter.patch('/:id', uploadAvatar.single('avatar'), async (req, res) => {
       }
       avatarUrl  = `/uploads/${req.file.filename}`
       avatarType = 'upload'
-      if (typeof req.body?.avatarCrop === 'string' && req.body.avatarCrop) {
-        try {
-          const parsed = JSON.parse(req.body.avatarCrop)
-          if (parsed && typeof parsed === 'object') avatarCrop = parsed
-        } catch { /* ignore */ }
-      }
+      avatarCrop = parseAvatarCrop(req.body?.avatarCrop)
     } else if (req.body?.dicebearSeed) {
       if (current.avatar_type === 'upload' && current.avatar_url.startsWith('/uploads/')) {
         oldFileToDelete = current.avatar_url
@@ -157,12 +172,7 @@ authorsRouter.patch('/:id', uploadAvatar.single('avatar'), async (req, res) => {
       avatarType = 'dicebear'
       avatarCrop = null
     } else if (req.body?.avatarCrop !== undefined) {
-      try {
-        const parsed = typeof req.body.avatarCrop === 'string'
-          ? JSON.parse(req.body.avatarCrop)
-          : req.body.avatarCrop
-        if (parsed && typeof parsed === 'object') avatarCrop = parsed
-      } catch { /* ignore */ }
+      avatarCrop = parseAvatarCrop(req.body.avatarCrop) ?? avatarCrop
     }
 
     const { rows } = await query<AuthorRow>(
@@ -192,7 +202,7 @@ authorsRouter.patch('/:id', uploadAvatar.single('avatar'), async (req, res) => {
 // ── Delete ────────────────────────────────────────────
 authorsRouter.delete('/:id', async (req, res) => {
   try {
-    const id = req.params.id
+    const id = requireUuid(req.params.id, 'id')
     const { rows } = await query<{ avatar_url: string; avatar_type: string }>(
       'DELETE FROM authors WHERE id = $1 RETURNING avatar_url, avatar_type',
       [id],

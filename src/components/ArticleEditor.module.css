@@ -655,6 +655,15 @@
   line-height: 1.6;
 }
 
+.previewParagraph a,
+.previewHeading a,
+.previewPullquote a {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent-sage);
+  text-underline-offset: 3px;
+}
+
 .previewFig {
   margin: 32px 0;
 }

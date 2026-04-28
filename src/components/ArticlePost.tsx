@@ -4,6 +4,7 @@ import { articlesApi } from '../api'
 import { useAuth } from '../auth'
 import type { Article, PinPosition } from '../types'
 import { Avatar } from './Avatar'
+import { renderRichText } from '../richText'
 
 interface ArticlePostProps {
   articleId:   string
@@ -245,9 +246,9 @@ export function ArticlePost({ articleId, onBack, onOpenOther, onEdit }: ArticleP
         {/* Body */}
         <div className={styles.body}>
           {article.body.map((block, i) => {
-            if (block.type === 'paragraph') return <p key={i} className={styles.paragraph}>{block.text}</p>
-            if (block.type === 'heading')   return <h2 key={i} className={styles.sectionHeading}>{block.text}</h2>
-            if (block.type === 'pullquote') return <blockquote key={i} className={styles.pullquote}>{block.text}</blockquote>
+            if (block.type === 'paragraph') return <p key={i} className={styles.paragraph}>{renderRichText(block.text)}</p>
+            if (block.type === 'heading')   return <h2 key={i} className={styles.sectionHeading}>{renderRichText(block.text)}</h2>
+            if (block.type === 'pullquote') return <blockquote key={i} className={styles.pullquote}>{renderRichText(block.text)}</blockquote>
             if (block.type === 'image') {
               return (
                 <figure key={i} className={styles.inlineFigure}>
