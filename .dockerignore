@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+.git
+.env
+.env.*
+*.log
+server/node_modules
+server/dist
+server/uploads/*
+!server/uploads/.gitkeep
