@@ -37,6 +37,7 @@ export type PinPosition = 'left' | 'right_top' | 'right_bottom'
 
 export interface Article {
   id:             string
+  slug:           string
   title:          string
   subtitle:       string | null
   readingTimeMin: number

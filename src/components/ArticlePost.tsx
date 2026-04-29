@@ -7,9 +7,9 @@ import { Avatar } from './Avatar'
 import { renderRichText } from '../richText'
 
 interface ArticlePostProps {
-  articleId:   string
+  articleSlug: string
   onBack:      () => void
-  onOpenOther: (id: string) => void
+  onOpenOther: (slug: string) => void
   onEdit:      (id: string) => void
 }
 
@@ -33,7 +33,7 @@ const PIN_LABELS: Record<PinPosition, string> = {
   right_bottom: 'Destaque inferior',
 }
 
-export function ArticlePost({ articleId, onBack, onOpenOther, onEdit }: ArticlePostProps) {
+export function ArticlePost({ articleSlug, onBack, onOpenOther, onEdit }: ArticlePostProps) {
   const { user } = useAuth()
 
   const [article, setArticle] = useState<Article | null>(null)
@@ -47,7 +47,7 @@ export function ArticlePost({ articleId, onBack, onOpenOther, onEdit }: ArticleP
     setError(null)
     try {
       const [a, list] = await Promise.all([
-        articlesApi.get(articleId),
+        articlesApi.getBySlug(articleSlug),
         articlesApi.list(1, 4),
       ])
       setArticle(a)
@@ -57,7 +57,7 @@ export function ArticlePost({ articleId, onBack, onOpenOther, onEdit }: ArticleP
     } finally {
       setLoading(false)
     }
-  }, [articleId])
+  }, [articleSlug])
 
   useEffect(() => { load() }, [load])
 
@@ -294,7 +294,7 @@ export function ArticlePost({ articleId, onBack, onOpenOther, onEdit }: ArticleP
                 <button
                   key={post.id}
                   className={styles.relatedCard}
-                  onClick={() => onOpenOther(post.id)}
+                  onClick={() => onOpenOther(post.slug)}
                 >
                   <div className={styles.relatedImageWrap}>
                     <img

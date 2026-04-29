@@ -22,7 +22,7 @@ type PinPosition = typeof PIN_POSITIONS[number]
 // ── Full joined row ──────────────────────────────────
 
 const JOIN_SELECT = `
-  a.id, a.title, a.subtitle, a.reading_time_min,
+  a.id, a.slug, a.title, a.subtitle, a.reading_time_min,
   a.hero_image, a.hero_caption, a.body, a.status, a.pin_position,
   a.published_at, a.created_at, a.updated_at,
   c.id   AS category_id,   c.name AS category_name,
@@ -41,6 +41,7 @@ const JOIN_FROM = `
 
 interface JoinedRow {
   id: string
+  slug: string
   title: string
   subtitle: string | null
   reading_time_min: number
@@ -67,6 +68,7 @@ interface JoinedRow {
 function toDto(r: JoinedRow) {
   return {
     id: r.id,
+    slug: r.slug,
     title: r.title,
     subtitle: r.subtitle,
     readingTimeMin: r.reading_time_min,
@@ -89,6 +91,35 @@ function toDto(r: JoinedRow) {
       avatarCrop: r.author_avatar_crop ?? null,
     } : null,
   }
+}
+
+function slugifyTitle(title: string): string {
+  const normalized = title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return normalized || 'artigo'
+}
+
+async function generateUniqueSlug(title: string, excludeId?: string): Promise<string> {
+  const base = slugifyTitle(title)
+
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const slug = attempt === 0 ? base : `${base}-${attempt + 1}`
+    const params = excludeId ? [slug, excludeId] : [slug]
+    const where = excludeId ? 'slug = $1 AND id <> $2' : 'slug = $1'
+    const { rowCount } = await query(
+      `SELECT 1 FROM articles WHERE ${where} LIMIT 1`,
+      params,
+    )
+
+    if (!rowCount) return slug
+  }
+
+  throw httpError(500, 'Nao foi possivel gerar um slug unico para o artigo')
 }
 
 // ── List: pinned (separately) + recent (paginated) ──
@@ -162,6 +193,26 @@ articlesRouter.get('/:id', optionalAuth, async (req, res) => {
   }
 })
 
+articlesRouter.get('/slug/:slug', optionalAuth, async (req, res) => {
+  try {
+    const slug = requireString(req.params.slug, 'slug', 240).toLowerCase()
+    const { rows } = await query<JoinedRow>(
+      `SELECT ${JOIN_SELECT} ${JOIN_FROM}
+       WHERE a.slug = $1 AND (a.status = 'published' OR $2::boolean)`,
+      [slug, Boolean(req.user)],
+    )
+    if (!rows[0]) throw httpError(404, 'Artigo nao encontrado')
+    res.json(toDto(rows[0]))
+  } catch (err) {
+    if (isHttpError(err)) {
+      res.status(err.statusCode).json({ error: err.message })
+    } else {
+      console.error(err)
+      res.status(500).json({ error: 'Erro interno' })
+    }
+  }
+})
+
 // ── Create ───────────────────────────────────────────
 articlesRouter.post('/', requireAuth, async (req, res) => {
   try {
@@ -174,18 +225,19 @@ articlesRouter.post('/', requireAuth, async (req, res) => {
     const badgeId     = optionalUuid(req.body?.badgeId,    'badgeId')
     const readingTimeMin = requireInt(req.body?.readingTimeMin ?? 5, 'readingTimeMin', 1, 180)
     const body = sanitizeBody(req.body?.body)
+    const slug = await generateUniqueSlug(title)
 
     const status = req.body?.status === 'draft' ? 'draft' : 'published'
     const publishedAt = status === 'published' ? new Date() : null
 
     const { rows } = await query<{ id: string }>(
       `INSERT INTO articles
-         (title, subtitle, category_id, author_id, badge_id,
+         (slug, title, subtitle, category_id, author_id, badge_id,
           reading_time_min, hero_image, hero_caption, body, status, published_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)
        RETURNING id`,
       [
-        title, subtitle, categoryId, authorId, badgeId,
+        slug, title, subtitle, categoryId, authorId, badgeId,
         readingTimeMin, heroImage, heroCaption,
         JSON.stringify(body),
         status, publishedAt,
@@ -229,6 +281,9 @@ articlesRouter.patch('/:id', requireAuth, async (req, res) => {
       ? requireInt(req.body.readingTimeMin, 'readingTimeMin', 1, 180)
       : current.reading_time_min
     const body = req.body?.body !== undefined ? sanitizeBody(req.body.body) : current.body
+    const slug = title !== current.title
+      ? await generateUniqueSlug(title, id)
+      : current.slug
 
     const status = req.body?.status === 'draft'     ? 'draft'
                  : req.body?.status === 'published' ? 'published'
@@ -237,12 +292,12 @@ articlesRouter.patch('/:id', requireAuth, async (req, res) => {
 
     await query(
       `UPDATE articles SET
-         title = $1, subtitle = $2, category_id = $3, author_id = $4, badge_id = $5,
-         reading_time_min = $6, hero_image = $7, hero_caption = $8,
-         body = $9::jsonb, status = $10, published_at = $11
-       WHERE id = $12`,
+         slug = $1, title = $2, subtitle = $3, category_id = $4, author_id = $5, badge_id = $6,
+         reading_time_min = $7, hero_image = $8, hero_caption = $9,
+         body = $10::jsonb, status = $11, published_at = $12
+       WHERE id = $13`,
       [
-        title, subtitle, categoryId, authorId, badgeId,
+        slug, title, subtitle, categoryId, authorId, badgeId,
         readingTimeMin, heroImage, heroCaption,
         JSON.stringify(body),
         status, publishedAt, id,

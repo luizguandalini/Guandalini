@@ -119,6 +119,8 @@ export const articlesApi = {
 
   get: (id: string) => request<Article>(`/api/articles/${id}`),
 
+  getBySlug: (slug: string) => request<Article>(`/api/articles/slug/${encodeURIComponent(slug)}`),
+
   create: (payload: ArticlePayload) =>
     request<Article>('/api/articles', { method: 'POST', body: JSON.stringify(payload) }),
 

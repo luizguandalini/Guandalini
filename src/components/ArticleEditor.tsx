@@ -398,7 +398,7 @@ function Preview({ data, categories, badges, author }: PreviewProps) {
 
 interface ArticleEditorProps {
   onExit:       () => void
-  onPublished:  (id: string) => void
+  onPublished:  (article: { id: string; slug: string }) => void
   articleId?:   string
 }
 
@@ -517,7 +517,7 @@ export function ArticleEditor({ onExit, onPublished, articleId }: ArticleEditorP
       const res = articleId
         ? await articlesApi.update(articleId, payload)
         : await articlesApi.create(payload)
-      onPublished(res.id)
+      onPublished({ id: res.id, slug: res.slug })
     } catch (err) {
       setPublishErr(err instanceof Error ? err.message : 'Erro ao publicar')
     } finally {

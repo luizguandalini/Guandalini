@@ -19,7 +19,7 @@ const excerptOf = (a: Article): string => {
 }
 
 interface HomePageProps {
-  onOpenArticle: (id: string) => void
+  onOpenArticle: (slug: string) => void
 }
 
 export function HomePage({ onOpenArticle }: HomePageProps) {
@@ -103,10 +103,10 @@ export function HomePage({ onOpenArticle }: HomePageProps) {
           <div className={styles.heroInner}>
             <article
               className={styles.featuredCard}
-              onClick={() => onOpenArticle(featured.id)}
+              onClick={() => onOpenArticle(featured.slug)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onOpenArticle(featured.id)}
+              onKeyDown={(e) => e.key === 'Enter' && onOpenArticle(featured.slug)}
             >
               <div className={styles.featuredImageWrap}>
                 <img
@@ -133,10 +133,10 @@ export function HomePage({ onOpenArticle }: HomePageProps) {
                 <article
                   key={post.id}
                   className={styles.secondaryCard}
-                  onClick={() => onOpenArticle(post.id)}
+                  onClick={() => onOpenArticle(post.slug)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && onOpenArticle(post.id)}
+                  onKeyDown={(e) => e.key === 'Enter' && onOpenArticle(post.slug)}
                 >
                   <div className={styles.secondaryImageWrap}>
                     <img
@@ -199,10 +199,10 @@ export function HomePage({ onOpenArticle }: HomePageProps) {
             <article
               key={post.id}
               className={styles.gridCard}
-              onClick={() => onOpenArticle(post.id)}
+              onClick={() => onOpenArticle(post.slug)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onOpenArticle(post.id)}
+              onKeyDown={(e) => e.key === 'Enter' && onOpenArticle(post.slug)}
             >
               <div className={styles.gridImageWrap}>
                 <img

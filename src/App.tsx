@@ -1,27 +1,35 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navbar } from './components/Navbar'
 import { HomePage } from './components/HomePage'
 import { ArticlePost } from './components/ArticlePost'
 import { ArticleEditor } from './components/ArticleEditor'
 import { Footer } from './components/Footer'
 import { LoginPage } from './components/LoginPage'
-import { AdminLayout, type AdminTab } from './components/AdminLayout'
+import { AdminLayout } from './components/AdminLayout'
 import { AdminAuthors } from './components/AdminAuthors'
 import { AdminNameList } from './components/AdminNameList'
 import { badgesApi, categoriesApi } from './api'
 import { useAuth } from './auth'
-
-type Page =
-  | { name: 'home' }
-  | { name: 'article'; id: string }
-  | { name: 'editor';  id?: string }
-  | { name: 'admin';   tab: AdminTab }
-  | { name: 'login' }
+import { hrefForRoute, routeFromLocation, type AppRoute } from './routes'
 
 export default function App() {
   const { user, loading } = useAuth()
-  const [page, setPage] = useState<Page>({ name: 'home' })
-  const go = (p: Page) => setPage(p)
+  const [page, setPage] = useState<AppRoute>(() => routeFromLocation(window.location))
+
+  useEffect(() => {
+    const onPopState = () => setPage(routeFromLocation(window.location))
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  const go = (p: AppRoute) => {
+    const nextHref = hrefForRoute(p)
+    const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    if (nextHref !== currentHref) {
+      window.history.pushState(null, '', nextHref)
+    }
+    setPage(p)
+  }
   const protectedPage = page.name === 'editor' || page.name === 'admin'
 
   // ── Global splash while we check the token ──
@@ -53,7 +61,7 @@ export default function App() {
     return (
       <ArticleEditor
         onExit={() => go({ name: 'home' })}
-        onPublished={(id) => go({ name: 'article', id })}
+        onPublished={(article) => go({ name: 'article', slug: article.slug })}
         articleId={page.id}
       />
     )
@@ -69,14 +77,14 @@ export default function App() {
       />
 
       {page.name === 'home' && (
-        <HomePage onOpenArticle={(id) => go({ name: 'article', id })} />
+        <HomePage onOpenArticle={(slug) => go({ name: 'article', slug })} />
       )}
 
       {page.name === 'article' && (
         <ArticlePost
-          articleId={page.id}
+          articleSlug={page.slug}
           onBack={() => go({ name: 'home' })}
-          onOpenOther={(id) => go({ name: 'article', id })}
+          onOpenOther={(slug) => go({ name: 'article', slug })}
           onEdit={(id) => go({ name: 'editor', id })}
         />
       )}
