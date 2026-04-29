@@ -445,7 +445,15 @@
 }
 
 .relatedCard {
+  width: 100%;
   display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
   transition: transform 0.2s ease;
 }
