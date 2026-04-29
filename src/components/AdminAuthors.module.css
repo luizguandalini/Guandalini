@@ -75,11 +75,13 @@
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-text-primary);
+  overflow-wrap: anywhere;
 }
 
 .rowRole {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .rowActions {
@@ -367,5 +369,7 @@
   .input {
     height: 42px;
     font-size: 0.875rem;
+    width: 100%;
+    min-width: 0;
   }
 }

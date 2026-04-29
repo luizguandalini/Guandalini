@@ -112,18 +112,15 @@
   }
 
   .nav {
-    flex-direction: row;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-    margin: 0 -2px;
-    scroll-snap-type: x proximity;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .navItem {
+    min-width: 0;
     white-space: nowrap;
-    flex: 0 0 auto;
-    scroll-snap-align: start;
+    text-align: center;
   }
 
   .title {
@@ -133,10 +130,11 @@
 
 @media (max-width: 560px) {
   .page {
-    padding-inline: 12px;
+    padding: 18px 8px 48px;
   }
 
   .sidebar {
+    padding: 12px;
     border-radius: 20px;
   }
 
@@ -145,7 +143,7 @@
   }
 
   .navItem {
-    padding: 10px 12px;
+    padding: 10px 8px;
     font-size: 0.8125rem;
   }
 

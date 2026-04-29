@@ -94,6 +94,7 @@
 
 .meta {
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .status {
@@ -128,6 +129,12 @@
 .subtitle,
 .infoRow {
   color: var(--color-text-secondary);
+}
+
+.slug,
+.title,
+.subtitle {
+  overflow-wrap: anywhere;
 }
 
 .link {

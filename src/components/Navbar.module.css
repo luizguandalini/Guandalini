@@ -218,3 +218,33 @@
     gap: 16px;
   }
 }
+
+@media (max-width: 480px) {
+  .inner {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .logo {
+    font-size: 1.05rem;
+  }
+
+  .actions {
+    gap: 8px;
+  }
+
+  .searchBtn {
+    display: none;
+  }
+
+  .writeBtn {
+    height: 34px;
+    padding: 0 12px;
+    font-size: 0.75rem;
+  }
+
+  .userBtn {
+    width: 34px;
+    height: 34px;
+  }
+}
