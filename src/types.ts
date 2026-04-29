@@ -34,6 +34,7 @@ export interface ImageBlock     { type: 'image';     src: string; caption: strin
 export type ArticleBlock = ParagraphBlock | HeadingBlock | PullquoteBlock | ImageBlock
 
 export type PinPosition = 'left' | 'right_top' | 'right_bottom'
+export type ArticleStatus = 'draft' | 'published' | 'archived'
 
 export interface Article {
   id:             string
@@ -44,7 +45,7 @@ export interface Article {
   heroImage:      string | null
   heroCaption:    string | null
   body:           ArticleBlock[]
-  status:         'draft' | 'published'
+  status:         ArticleStatus
   pinPosition:    PinPosition | null
   publishedAt:    string | null
   createdAt:      string
@@ -69,4 +70,8 @@ export interface ArticleList {
   limit:   number
   total:   number
   hasMore: boolean
+}
+
+export interface AdminArticleList extends Paginated<Article> {
+  items: Article[]
 }

@@ -2,7 +2,7 @@ export type AppRoute =
   | { name: 'home' }
   | { name: 'article'; slug: string }
   | { name: 'editor'; id?: string }
-  | { name: 'admin'; tab: 'authors' | 'categories' | 'badges' }
+  | { name: 'admin'; tab: 'articles' | 'authors' | 'categories' | 'badges' }
   | { name: 'login' }
 
 const ARTICLE_PREFIX = '/noticia/'
@@ -41,7 +41,7 @@ export function routeFromLocation(location: Location): AppRoute {
 
   if (path.startsWith('/admin/')) {
     const tab = path.slice('/admin/'.length)
-    if (tab === 'authors' || tab === 'categories' || tab === 'badges') {
+    if (tab === 'articles' || tab === 'authors' || tab === 'categories' || tab === 'badges') {
       return { name: 'admin', tab }
     }
   }

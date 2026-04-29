@@ -1,4 +1,5 @@
 import type {
+  AdminArticleList,
   Article,
   ArticleList,
   Author,
@@ -110,7 +111,7 @@ export interface ArticlePayload {
   heroImage:     string | null
   heroCaption:   string | null
   body:          Article['body']
-  status:        'draft' | 'published'
+  status:        'draft' | 'published' | 'archived'
 }
 
 export const articlesApi = {
@@ -120,6 +121,9 @@ export const articlesApi = {
   get: (id: string) => request<Article>(`/api/articles/${id}`),
 
   getBySlug: (slug: string) => request<Article>(`/api/articles/slug/${encodeURIComponent(slug)}`),
+
+  adminList: (page = 1, limit = 10, q = '') =>
+    request<AdminArticleList>(`/api/articles/admin?page=${page}&limit=${limit}&q=${encodeURIComponent(q)}`),
 
   create: (payload: ArticlePayload) =>
     request<Article>('/api/articles', { method: 'POST', body: JSON.stringify(payload) }),
@@ -131,6 +135,12 @@ export const articlesApi = {
     request<Article>(`/api/articles/${id}/pin`, {
       method: 'PATCH',
       body: JSON.stringify({ position }),
+    }),
+
+  setStatus: (id: string, status: ArticlePayload['status']) =>
+    request<Article>(`/api/articles/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
     }),
 
   remove: (id: string) => request<{ ok: true }>(`/api/articles/${id}`, { method: 'DELETE' }),

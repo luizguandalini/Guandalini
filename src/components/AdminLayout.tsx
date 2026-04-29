@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import styles from './AdminLayout.module.css'
 
-export type AdminTab = 'authors' | 'categories' | 'badges'
+export type AdminTab = 'articles' | 'authors' | 'categories' | 'badges'
 
 interface AdminLayoutProps {
   active:    AdminTab
@@ -19,6 +19,12 @@ export function AdminLayout({ active, onNavigate, title, subtitle, children }: A
           <span className={styles.sidebarLabel}>Administração</span>
 
           <nav className={styles.nav}>
+            <button
+              className={`${styles.navItem} ${active === 'articles' ? styles.active : ''}`}
+              onClick={() => onNavigate('articles')}
+            >
+              Artigos
+            </button>
             <button
               className={`${styles.navItem} ${active === 'authors' ? styles.active : ''}`}
               onClick={() => onNavigate('authors')}

@@ -17,9 +17,9 @@ import {
 export const articlesRouter = Router()
 
 const PIN_POSITIONS = ['left', 'right_top', 'right_bottom'] as const
+const ARTICLE_STATUSES = ['draft', 'published', 'archived'] as const
 type PinPosition = typeof PIN_POSITIONS[number]
-
-// ── Full joined row ──────────────────────────────────
+type ArticleStatus = typeof ARTICLE_STATUSES[number]
 
 const JOIN_SELECT = `
   a.id, a.slug, a.title, a.subtitle, a.reading_time_min,
@@ -53,16 +53,16 @@ interface JoinedRow {
   published_at: Date | null
   created_at: Date
   updated_at: Date
-  category_id:   string | null
+  category_id: string | null
   category_name: string | null
-  badge_id:      string | null
-  badge_name:    string | null
-  author_id:           string | null
-  author_name:         string | null
-  author_role:         string | null
-  author_avatar_url:   string | null
-  author_avatar_type:  string | null
-  author_avatar_crop:  unknown
+  badge_id: string | null
+  badge_name: string | null
+  author_id: string | null
+  author_name: string | null
+  author_role: string | null
+  author_avatar_url: string | null
+  author_avatar_type: string | null
+  author_avatar_crop: unknown
 }
 
 function toDto(r: JoinedRow) {
@@ -75,17 +75,17 @@ function toDto(r: JoinedRow) {
     heroImage: r.hero_image,
     heroCaption: r.hero_caption,
     body: r.body ?? [],
-    status: r.status,
+    status: r.status as ArticleStatus,
     pinPosition: r.pin_position as PinPosition | null,
     publishedAt: r.published_at,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     category: r.category_id ? { id: r.category_id, name: r.category_name } : null,
-    badge:    r.badge_id    ? { id: r.badge_id,    name: r.badge_name }    : null,
-    author:   r.author_id   ? {
-      id:        r.author_id,
-      name:      r.author_name,
-      role:      r.author_role,
+    badge: r.badge_id ? { id: r.badge_id, name: r.badge_name } : null,
+    author: r.author_id ? {
+      id: r.author_id,
+      name: r.author_name,
+      role: r.author_role,
       avatarUrl: r.author_avatar_url,
       avatarType: r.author_avatar_type,
       avatarCrop: r.author_avatar_crop ?? null,
@@ -122,13 +122,36 @@ async function generateUniqueSlug(title: string, excludeId?: string): Promise<st
   throw httpError(500, 'Nao foi possivel gerar um slug unico para o artigo')
 }
 
-// ── List: pinned (separately) + recent (paginated) ──
+function normalizeArticleLookup(input: string): string {
+  const clean = input.trim().toLowerCase()
+  if (!clean) return ''
+
+  try {
+    const parsed = new URL(clean)
+    const marker = '/noticia/'
+    const index = parsed.pathname.toLowerCase().indexOf(marker)
+    if (index >= 0) {
+      return decodeURIComponent(parsed.pathname.slice(index + marker.length)).replace(/^\/+|\/+$/g, '')
+    }
+  } catch {
+    // Ignore invalid URLs and try local-path/slug parsing below.
+  }
+
+  const marker = '/noticia/'
+  const localIndex = clean.indexOf(marker)
+  if (localIndex >= 0) {
+    return decodeURIComponent(clean.slice(localIndex + marker.length)).replace(/^\/+|\/+$/g, '')
+  }
+
+  return clean.replace(/^\/+|\/+$/g, '')
+}
+
 articlesRouter.get('/', async (req, res) => {
   try {
-    const rawPage  = Number(req.query.page ?? 1)
+    const rawPage = Number(req.query.page ?? 1)
     const rawLimit = Number(req.query.limit ?? 9)
-    const page     = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
-    const limit    = Number.isInteger(rawLimit) ? Math.min(30, Math.max(1, rawLimit)) : 9
+    const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
+    const limit = Number.isInteger(rawLimit) ? Math.min(30, Math.max(1, rawLimit)) : 9
     const offset = (page - 1) * limit
 
     const { rows: pinned } = await query<JoinedRow>(
@@ -172,17 +195,51 @@ articlesRouter.get('/', async (req, res) => {
   }
 })
 
-// ── Get one by id ────────────────────────────────────
-articlesRouter.get('/:id', optionalAuth, async (req, res) => {
+articlesRouter.get('/admin', requireAuth, async (req, res) => {
   try {
-    const id = requireUuid(req.params.id, 'id')
-    const { rows } = await query<JoinedRow>(
-      `SELECT ${JOIN_SELECT} ${JOIN_FROM}
-       WHERE a.id = $1 AND (a.status = 'published' OR $2::boolean)`,
-      [id, Boolean(req.user)],
+    const rawPage = Number(req.query.page ?? 1)
+    const rawLimit = Number(req.query.limit ?? 10)
+    const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1
+    const limit = Number.isInteger(rawLimit) ? Math.min(50, Math.max(1, rawLimit)) : 10
+    const offset = (page - 1) * limit
+    const lookup = typeof req.query.q === 'string' ? normalizeArticleLookup(req.query.q) : ''
+    const searchPattern = lookup ? `%${lookup.replace(/[%_]/g, '\\$&')}%` : null
+
+    const filters: string[] = []
+    const params: Array<string | number> = []
+
+    if (lookup) {
+      params.push(lookup, searchPattern!)
+      filters.push(`(LOWER(a.slug) = $1 OR LOWER(a.slug) LIKE $2 ESCAPE '\\')`)
+    }
+
+    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
+    const paginationParams = [...params, limit, offset]
+
+    const { rows: items } = await query<JoinedRow>(
+      `SELECT ${JOIN_SELECT}
+       ${JOIN_FROM}
+       ${where}
+       ORDER BY COALESCE(a.published_at, a.created_at) DESC, a.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      paginationParams,
     )
-    if (!rows[0]) throw httpError(404, 'Artigo não encontrado')
-    res.json(toDto(rows[0]))
+
+    const { rows: countRows } = await query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM articles a
+       ${where}`,
+      params,
+    )
+    const total = Number(countRows[0]?.count ?? 0)
+
+    res.json({
+      items: items.map(toDto),
+      page,
+      limit,
+      total,
+      hasMore: offset + items.length < total,
+    })
   } catch (err) {
     if (isHttpError(err)) {
       res.status(err.statusCode).json({ error: err.message })
@@ -213,16 +270,35 @@ articlesRouter.get('/slug/:slug', optionalAuth, async (req, res) => {
   }
 })
 
-// ── Create ───────────────────────────────────────────
+articlesRouter.get('/:id', optionalAuth, async (req, res) => {
+  try {
+    const id = requireUuid(req.params.id, 'id')
+    const { rows } = await query<JoinedRow>(
+      `SELECT ${JOIN_SELECT} ${JOIN_FROM}
+       WHERE a.id = $1 AND (a.status = 'published' OR $2::boolean)`,
+      [id, Boolean(req.user)],
+    )
+    if (!rows[0]) throw httpError(404, 'Artigo nao encontrado')
+    res.json(toDto(rows[0]))
+  } catch (err) {
+    if (isHttpError(err)) {
+      res.status(err.statusCode).json({ error: err.message })
+    } else {
+      console.error(err)
+      res.status(500).json({ error: 'Erro interno' })
+    }
+  }
+})
+
 articlesRouter.post('/', requireAuth, async (req, res) => {
   try {
-    const title       = requireString(req.body?.title,    'title',    LIMITS.title)
-    const subtitle    = optionalString(req.body?.subtitle,            LIMITS.subtitle)
-    const heroImage   = optionalUrl(req.body?.heroImage,              LIMITS.heroImage)
-    const heroCaption = optionalString(req.body?.heroCaption,         LIMITS.heroCaption)
-    const categoryId  = optionalUuid(req.body?.categoryId, 'categoryId')
-    const authorId    = optionalUuid(req.body?.authorId,   'authorId')
-    const badgeId     = optionalUuid(req.body?.badgeId,    'badgeId')
+    const title = requireString(req.body?.title, 'title', LIMITS.title)
+    const subtitle = optionalString(req.body?.subtitle, LIMITS.subtitle)
+    const heroImage = optionalUrl(req.body?.heroImage, LIMITS.heroImage)
+    const heroCaption = optionalString(req.body?.heroCaption, LIMITS.heroCaption)
+    const categoryId = optionalUuid(req.body?.categoryId, 'categoryId')
+    const authorId = optionalUuid(req.body?.authorId, 'authorId')
+    const badgeId = optionalUuid(req.body?.badgeId, 'badgeId')
     const readingTimeMin = requireInt(req.body?.readingTimeMin ?? 5, 'readingTimeMin', 1, 180)
     const body = sanitizeBody(req.body?.body)
     const slug = await generateUniqueSlug(title)
@@ -259,7 +335,6 @@ articlesRouter.post('/', requireAuth, async (req, res) => {
   }
 })
 
-// ── Update ───────────────────────────────────────────
 articlesRouter.patch('/:id', requireAuth, async (req, res) => {
   try {
     const id = requireUuid(req.params.id, 'id')
@@ -268,15 +343,15 @@ articlesRouter.patch('/:id', requireAuth, async (req, res) => {
       [id],
     )
     const current = existing[0]
-    if (!current) throw httpError(404, 'Artigo não encontrado')
+    if (!current) throw httpError(404, 'Artigo nao encontrado')
 
-    const title     = req.body?.title     !== undefined ? requireString(req.body.title,  'title', LIMITS.title)  : current.title
-    const subtitle  = req.body?.subtitle  !== undefined ? optionalString(req.body.subtitle, LIMITS.subtitle)     : current.subtitle
-    const heroImage = req.body?.heroImage !== undefined ? optionalUrl(req.body.heroImage, LIMITS.heroImage)       : current.hero_image
+    const title = req.body?.title !== undefined ? requireString(req.body.title, 'title', LIMITS.title) : current.title
+    const subtitle = req.body?.subtitle !== undefined ? optionalString(req.body.subtitle, LIMITS.subtitle) : current.subtitle
+    const heroImage = req.body?.heroImage !== undefined ? optionalUrl(req.body.heroImage, LIMITS.heroImage) : current.hero_image
     const heroCaption = req.body?.heroCaption !== undefined ? optionalString(req.body.heroCaption, LIMITS.heroCaption) : current.hero_caption
     const categoryId = req.body?.categoryId !== undefined ? optionalUuid(req.body.categoryId, 'categoryId') : current.category_id
-    const authorId   = req.body?.authorId   !== undefined ? optionalUuid(req.body.authorId,   'authorId')   : current.author_id
-    const badgeId    = req.body?.badgeId    !== undefined ? optionalUuid(req.body.badgeId,    'badgeId')    : current.badge_id
+    const authorId = req.body?.authorId !== undefined ? optionalUuid(req.body.authorId, 'authorId') : current.author_id
+    const badgeId = req.body?.badgeId !== undefined ? optionalUuid(req.body.badgeId, 'badgeId') : current.badge_id
     const readingTimeMin = req.body?.readingTimeMin !== undefined
       ? requireInt(req.body.readingTimeMin, 'readingTimeMin', 1, 180)
       : current.reading_time_min
@@ -285,22 +360,24 @@ articlesRouter.patch('/:id', requireAuth, async (req, res) => {
       ? await generateUniqueSlug(title, id)
       : current.slug
 
-    const status = req.body?.status === 'draft'     ? 'draft'
-                 : req.body?.status === 'published' ? 'published'
-                 : current.status
-    const publishedAt = (status === 'published' && !current.published_at) ? new Date() : current.published_at
+    const status = req.body?.status === 'draft' ? 'draft'
+      : req.body?.status === 'published' ? 'published'
+      : req.body?.status === 'archived' ? 'archived'
+      : current.status
+    const publishedAt = status === 'published' && !current.published_at ? new Date() : current.published_at
+    const pinPosition = status === 'published' ? current.pin_position : null
 
     await query(
       `UPDATE articles SET
          slug = $1, title = $2, subtitle = $3, category_id = $4, author_id = $5, badge_id = $6,
          reading_time_min = $7, hero_image = $8, hero_caption = $9,
-         body = $10::jsonb, status = $11, published_at = $12
-       WHERE id = $13`,
+         body = $10::jsonb, status = $11, published_at = $12, pin_position = $13
+       WHERE id = $14`,
       [
         slug, title, subtitle, categoryId, authorId, badgeId,
         readingTimeMin, heroImage, heroCaption,
         JSON.stringify(body),
-        status, publishedAt, id,
+        status, publishedAt, pinPosition, id,
       ],
     )
 
@@ -319,7 +396,6 @@ articlesRouter.patch('/:id', requireAuth, async (req, res) => {
   }
 })
 
-// ── Pin / unpin ──────────────────────────────────────
 articlesRouter.patch('/:id/pin', requireAuth, async (req, res) => {
   try {
     const id = requireUuid(req.params.id, 'id')
@@ -333,7 +409,6 @@ articlesRouter.patch('/:id/pin', requireAuth, async (req, res) => {
       position = raw as PinPosition
     }
 
-    // Free up target slot first (if any other article occupies it)
     if (position) {
       await query(
         `UPDATE articles SET pin_position = NULL
@@ -346,7 +421,7 @@ articlesRouter.patch('/:id/pin', requireAuth, async (req, res) => {
       `UPDATE articles SET pin_position = $1 WHERE id = $2`,
       [position, id],
     )
-    if (!rowCount) throw httpError(404, 'Artigo não encontrado')
+    if (!rowCount) throw httpError(404, 'Artigo nao encontrado')
 
     const { rows } = await query<JoinedRow>(
       `SELECT ${JOIN_SELECT} ${JOIN_FROM} WHERE a.id = $1`,
@@ -363,12 +438,62 @@ articlesRouter.patch('/:id/pin', requireAuth, async (req, res) => {
   }
 })
 
-// ── Delete ───────────────────────────────────────────
+articlesRouter.patch('/:id/status', requireAuth, async (req, res) => {
+  try {
+    const id = requireUuid(req.params.id, 'id')
+    const rawStatus = requireString(req.body?.status, 'status', 20).toLowerCase()
+    if (!ARTICLE_STATUSES.includes(rawStatus as ArticleStatus)) {
+      throw httpError(400, `status deve ser um de: ${ARTICLE_STATUSES.join(', ')}`)
+    }
+
+    const nextStatus = rawStatus as ArticleStatus
+    const { rows: existing } = await query<{ id: string; published_at: Date | null }>(
+      'SELECT id, published_at FROM articles WHERE id = $1',
+      [id],
+    )
+    const current = existing[0]
+    if (!current) throw httpError(404, 'Artigo nao encontrado')
+
+    const publishedAt = nextStatus === 'published'
+      ? (current.published_at ?? new Date())
+      : current.published_at
+
+    if (nextStatus === 'published') {
+      await query(
+        `UPDATE articles
+           SET status = $1, published_at = $2
+         WHERE id = $3`,
+        [nextStatus, publishedAt, id],
+      )
+    } else {
+      await query(
+        `UPDATE articles
+           SET status = $1, pin_position = NULL
+         WHERE id = $2`,
+        [nextStatus, id],
+      )
+    }
+
+    const { rows } = await query<JoinedRow>(
+      `SELECT ${JOIN_SELECT} ${JOIN_FROM} WHERE a.id = $1`,
+      [id],
+    )
+    res.json(toDto(rows[0]))
+  } catch (err) {
+    if (isHttpError(err)) {
+      res.status(err.statusCode).json({ error: err.message })
+    } else {
+      console.error(err)
+      res.status(500).json({ error: err instanceof Error ? err.message : 'Erro interno' })
+    }
+  }
+})
+
 articlesRouter.delete('/:id', requireAuth, async (req, res) => {
   try {
     const id = requireUuid(req.params.id, 'id')
     const { rowCount } = await query('DELETE FROM articles WHERE id = $1', [id])
-    if (!rowCount) throw httpError(404, 'Artigo não encontrado')
+    if (!rowCount) throw httpError(404, 'Artigo nao encontrado')
     res.json({ ok: true })
   } catch (err) {
     if (isHttpError(err)) {

@@ -6,6 +6,7 @@ import { ArticleEditor } from './components/ArticleEditor'
 import { Footer } from './components/Footer'
 import { LoginPage } from './components/LoginPage'
 import { AdminLayout } from './components/AdminLayout'
+import { AdminArticles } from './components/AdminArticles'
 import { AdminAuthors } from './components/AdminAuthors'
 import { AdminNameList } from './components/AdminNameList'
 import { badgesApi, categoriesApi } from './api'
@@ -32,22 +33,22 @@ export default function App() {
   }
   const protectedPage = page.name === 'editor' || page.name === 'admin'
 
-  // ── Global splash while we check the token ──
   if (loading && protectedPage) {
     return (
       <div style={{
-        minHeight: '100vh', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         background: 'var(--color-bg)',
         color: 'var(--color-text-secondary)',
         fontSize: '0.875rem',
       }}>
-        Carregando…
+        Carregando...
       </div>
     )
   }
 
-  // ── Not authenticated → login screen ──
   if (protectedPage && !user) {
     return <LoginPage />
   }
@@ -56,7 +57,6 @@ export default function App() {
     return <LoginPage onSuccess={() => go({ name: 'home' })} />
   }
 
-  // Editor is full-screen (no navbar/footer)
   if (page.name === 'editor') {
     return (
       <ArticleEditor
@@ -72,7 +72,7 @@ export default function App() {
       <Navbar
         onLogoClick={() => go({ name: 'home' })}
         onWriteClick={() => go({ name: 'editor' })}
-        onAdminClick={() => go({ name: 'admin', tab: 'authors' })}
+        onAdminClick={() => go({ name: 'admin', tab: 'articles' })}
         onLoginClick={() => go({ name: 'login' })}
       />
 
@@ -94,18 +94,22 @@ export default function App() {
           active={page.tab}
           onNavigate={(tab) => go({ name: 'admin', tab })}
           title={
+            page.tab === 'articles'   ? 'Artigos' :
             page.tab === 'authors'    ? 'Autores' :
             page.tab === 'categories' ? 'Categorias' :
                                         'Badges de estilo'
           }
           subtitle={
-            page.tab === 'authors'
-              ? 'Gerencie autores reais ou fictícios. Selecione-os no editor ao publicar um artigo.'
-              : page.tab === 'categories'
-                ? 'Categorias para classificar os artigos.'
-                : 'Etiquetas rápidas, ex: "Deep Dive", "Opinião", "Tutorial".'
+            page.tab === 'articles'
+              ? 'Encontre artigos por URL, revise os mais recentes e gerencie edicao, arquivamento, restauracao e exclusao.'
+              : page.tab === 'authors'
+                ? 'Gerencie autores reais ou ficticios. Selecione-os no editor ao publicar um artigo.'
+                : page.tab === 'categories'
+                  ? 'Categorias para classificar os artigos.'
+                  : 'Etiquetas rapidas, ex: "Deep Dive", "Opiniao", "Tutorial".'
           }
         >
+          {page.tab === 'articles'   && <AdminArticles onEdit={(id) => go({ name: 'editor', id })} />}
           {page.tab === 'authors'    && <AdminAuthors />}
           {page.tab === 'categories' && (
             <AdminNameList
@@ -115,7 +119,7 @@ export default function App() {
               remove={categoriesApi.remove}
               singular="categoria"
               maxLength={60}
-              placeholder="Nova categoria…"
+              placeholder="Nova categoria..."
             />
           )}
           {page.tab === 'badges' && (
@@ -126,7 +130,7 @@ export default function App() {
               remove={badgesApi.remove}
               singular="badge"
               maxLength={60}
-              placeholder="Nova badge…"
+              placeholder="Nova badge..."
             />
           )}
         </AdminLayout>
