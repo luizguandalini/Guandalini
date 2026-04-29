@@ -4,9 +4,10 @@ set -eu
 APP_DIR="${APP_DIR:-/opt/guandalini-blog}"
 REPO_URL="${REPO_URL:-https://github.com/luizguandalini/Guandalini.git}"
 TARGET_SHA="${TARGET_SHA:-main}"
-APP_DOMAIN="${APP_DOMAIN:-guandalini.177.7.40.187.sslip.io}"
+APP_DOMAIN="${APP_DOMAIN:-luizguandalini.com.br}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-guandalini}"
 TRAEFIK_NETWORK="${TRAEFIK_NETWORK:-}"
+CANONICAL_CORS_ORIGIN="${CANONICAL_CORS_ORIGIN:-https://$APP_DOMAIN,https://www.$APP_DOMAIN}"
 SYNCED_SOURCE="${SYNCED_SOURCE:-0}"
 ENV_FILE="$APP_DIR/.env"
 SECRETS_DIR="$APP_DIR/.deploy"
@@ -27,6 +28,34 @@ random_hex() {
     tr -dc 'a-f0-9' < /dev/urandom | head -c "$((bytes * 2))"
     echo
   fi
+}
+
+set_env_value() {
+  key="$1"
+  value="$2"
+  file="$3"
+  tmp_file="${file}.tmp"
+
+  if [ -f "$file" ] && grep -q "^${key}=" "$file"; then
+    awk -v key="$key" -v value="$value" '
+      BEGIN { replaced = 0 }
+      index($0, key "=") == 1 && replaced == 0 {
+        print key "=" value
+        replaced = 1
+        next
+      }
+      { print }
+      END {
+        if (replaced == 0) {
+          print key "=" value
+        }
+      }
+    ' "$file" > "$tmp_file"
+    mv "$tmp_file" "$file"
+    return
+  fi
+
+  printf '%s=%s\n' "$key" "$value" >> "$file"
 }
 
 detect_traefik_network() {
@@ -116,7 +145,7 @@ JWT_EXPIRES_IN=7d
 API_PORT=3001
 NODE_ENV=production
 APP_DOMAIN=$APP_DOMAIN
-CORS_ORIGIN=https://$APP_DOMAIN
+CORS_ORIGIN=$CANONICAL_CORS_ORIGIN
 WEB_PORT=80
 EOF
 
@@ -129,6 +158,23 @@ Admin password: $ADMIN_PASSWORD
 Created automatically on first deploy. Keep this file private.
 EOF
   chmod 600 "$ENV_FILE" "$SECRETS_FILE"
+fi
+
+set_env_value "COMPOSE_PROJECT_NAME" "$COMPOSE_PROJECT_NAME" "$ENV_FILE"
+set_env_value "APP_DOMAIN" "$APP_DOMAIN" "$ENV_FILE"
+set_env_value "CORS_ORIGIN" "$CANONICAL_CORS_ORIGIN" "$ENV_FILE"
+
+if [ -f "$SECRETS_FILE" ]; then
+  ADMIN_EMAIL_LINE="$(grep '^ADMIN_EMAIL=' "$ENV_FILE" | head -n 1 | cut -d '=' -f 2- || true)"
+  ADMIN_PASSWORD_LINE="$(grep '^ADMIN_PASSWORD=' "$ENV_FILE" | head -n 1 | cut -d '=' -f 2- || true)"
+  cat > "$SECRETS_FILE" <<EOF
+App URL: https://$APP_DOMAIN
+Admin email: ${ADMIN_EMAIL_LINE:-admin@$APP_DOMAIN}
+Admin password: ${ADMIN_PASSWORD_LINE:-stored-in-.env}
+
+Updated automatically during deploy. Keep this file private.
+EOF
+  chmod 600 "$SECRETS_FILE"
 fi
 
 $COMPOSE -f docker-compose.prod.yml up -d --build --remove-orphans

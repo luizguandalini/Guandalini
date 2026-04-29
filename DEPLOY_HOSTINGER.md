@@ -49,8 +49,8 @@ Edite os valores:
 
 ```sh
 COMPOSE_PROJECT_NAME=guandalini
-APP_DOMAIN=guandalini.177.7.40.187.sslip.io
-CORS_ORIGIN=https://guandalini.177.7.40.187.sslip.io
+APP_DOMAIN=luizguandalini.com.br
+CORS_ORIGIN=https://luizguandalini.com.br,https://www.luizguandalini.com.br
 POSTGRES_PASSWORD=uma-senha-longa-e-randomica
 ADMIN_EMAIL=seu-email
 ADMIN_PASSWORD=uma-senha-admin-forte
@@ -73,10 +73,16 @@ docker compose -f docker-compose.prod.yml logs -f web api
 Depois acesse:
 
 ```txt
-https://blog.seudominio.com
+https://luizguandalini.com.br
 ```
 
 O certificado SSL deve ser emitido e renovado pelo Traefik/Let's Encrypt.
+
+Com a configuracao atual do `docker-compose.prod.yml`, o Traefik tambem aceita:
+
+```txt
+https://www.luizguandalini.com.br
+```
 
 ## 5. Deploy automatico pelo GitHub Actions
 

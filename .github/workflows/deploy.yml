@@ -20,7 +20,7 @@ jobs:
       VPS_HOST: 177.7.40.187
       VPS_USER: root
       APP_DIR: /opt/guandalini-blog
-      APP_DOMAIN: ${{ vars.APP_DOMAIN || 'guandalini.177.7.40.187.sslip.io' }}
+      APP_DOMAIN: ${{ vars.APP_DOMAIN || 'luizguandalini.com.br' }}
       COMPOSE_PROJECT_NAME: guandalini
       TRAEFIK_NETWORK: ${{ vars.TRAEFIK_NETWORK || '' }}
       HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
