@@ -25,6 +25,7 @@ jobs:
       TRAEFIK_NETWORK: ${{ vars.TRAEFIK_NETWORK || '' }}
       HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
       HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+      HOSTINGER_SSH_KNOWN_HOSTS: ${{ secrets.HOSTINGER_SSH_KNOWN_HOSTS }}
 
     steps:
       - name: Checkout
@@ -58,7 +59,18 @@ jobs:
           chmod 600 ~/.ssh/hostinger_deploy_key
 
           SSH_PORT="${HOSTINGER_SSH_PORT:-22}"
-          ssh-keyscan -T 15 -p "${SSH_PORT}" -H "${VPS_HOST}" >> ~/.ssh/known_hosts
+          if [ -n "${HOSTINGER_SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "${HOSTINGER_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          else
+            echo "::warning::HOSTINGER_SSH_KNOWN_HOSTS is not set; falling back to ssh-keyscan"
+            if ! ssh-keyscan -T 15 -p "${SSH_PORT}" -H "${VPS_HOST}" > ~/.ssh/known_hosts 2> /tmp/ssh-keyscan.log; then
+              echo "::error::ssh-keyscan failed for ${VPS_HOST}:${SSH_PORT}"
+              cat /tmp/ssh-keyscan.log >&2 || true
+              exit 1
+            fi
+          fi
+
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Upload source to VPS
         shell: bash
