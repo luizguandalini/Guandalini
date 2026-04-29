@@ -3,18 +3,24 @@
   position: relative;
 }
 
-/* ── Social Share Sidebar ─────────────────────────────── */
+.articleShell {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
 
 .socialShare {
-  position: fixed;
-  left: max(16px, calc(50% - 640px - 56px));
-  top: 50%;
-  transform: translateY(-50%);
+  position: sticky;
+  top: 132px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  z-index: 10;
+  align-self: start;
 }
 
 .shareLabel {
@@ -47,15 +53,19 @@
   border-color: var(--color-text-primary);
 }
 
-/* ── Article ──────────────────────────────────────────── */
-
-.article {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 64px 24px 80px;
+.shareFeedback {
+  width: 64px;
+  min-height: 32px;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+  text-align: center;
 }
 
-/* ── Back Button ──────────────────────────────────────── */
+.article {
+  min-width: 0;
+  padding: 64px 0 80px;
+}
 
 .backBtn {
   display: inline-flex;
@@ -76,8 +86,6 @@
 .backBtn:hover {
   color: var(--color-text-primary);
 }
-
-/* ── Admin row ───────────────────────────────────────── */
 
 .topRow {
   display: flex;
@@ -113,7 +121,9 @@
   transition: opacity 0.15s ease;
 }
 
-.editBtn:hover { opacity: 0.85; }
+.editBtn:hover {
+  opacity: 0.85;
+}
 
 .pinGroup {
   display: flex;
@@ -157,7 +167,10 @@
   color: var(--color-text-primary);
 }
 
-.pinBtn:disabled { cursor: not-allowed; opacity: 0.6; }
+.pinBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 
 .pinActive {
   background: var(--color-accent-sage);
@@ -177,9 +190,9 @@
   cursor: pointer;
 }
 
-.pinUnpin:hover { background: #FEF0F0; }
-
-/* ── Header ───────────────────────────────────────────── */
+.pinUnpin:hover {
+  background: #FEF0F0;
+}
 
 .header {
   text-align: center;
@@ -272,8 +285,6 @@
   color: var(--color-text-secondary);
 }
 
-/* ── Hero Image ───────────────────────────────────────── */
-
 .heroFigure {
   margin: 0 0 56px;
 }
@@ -292,8 +303,6 @@
   margin-top: 12px;
   line-height: 1.5;
 }
-
-/* ── Body ─────────────────────────────────────────────── */
 
 .body {
   max-width: 680px;
@@ -347,38 +356,6 @@
   border-radius: 16px;
 }
 
-/* ── Tags ─────────────────────────────────────────────── */
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 48px 0;
-  max-width: 680px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.tag {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-white);
-  border: 1px solid var(--color-border);
-  padding: 5px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.tag:hover {
-  background: var(--color-text-primary);
-  color: #FFFFFF;
-  border-color: var(--color-text-primary);
-}
-
-/* ── Author Bio ───────────────────────────────────────── */
-
 .authorBio {
   display: flex;
   gap: 16px;
@@ -414,8 +391,6 @@
   color: var(--color-text-secondary);
   line-height: 1.65;
 }
-
-/* ── Related Posts ────────────────────────────────────── */
 
 .related {
   background: var(--color-bg-white);
@@ -515,8 +490,6 @@
   font-size: 0.75rem;
   color: var(--color-text-secondary);
 }
-
-/* ── CTA / Newsletter ─────────────────────────────────── */
 
 .cta {
   background: var(--color-accent-dark);
@@ -620,17 +593,24 @@
   background: var(--color-accent-sage);
 }
 
-/* ── Responsive ───────────────────────────────────────── */
-
 @media (max-width: 1024px) {
+  .articleShell {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
   .socialShare {
     display: none;
   }
 }
 
 @media (max-width: 768px) {
+  .articleShell {
+    padding: 0 20px;
+  }
+
   .article {
-    padding: 40px 20px 60px;
+    padding: 40px 0 60px;
   }
 
   .relatedGrid {
