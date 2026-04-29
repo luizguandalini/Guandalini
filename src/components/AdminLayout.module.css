@@ -18,6 +18,11 @@
   position: sticky;
   top: 88px;
   align-self: start;
+  padding: 20px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,246,240,0.92) 100%);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.06);
 }
 
 .sidebarLabel {
@@ -86,26 +91,75 @@
   font-size: 0.9375rem;
   color: var(--color-text-secondary);
   line-height: 1.6;
+  max-width: 64ch;
 }
 
 /* ── Responsive ───────────────────────────────── */
 
 @media (max-width: 900px) {
+  .page {
+    padding: 24px 16px 56px;
+  }
+
   .inner {
     grid-template-columns: 1fr;
-    gap: 24px;
+    gap: 18px;
   }
 
   .sidebar {
     position: static;
+    padding: 16px;
   }
 
   .nav {
     flex-direction: row;
     overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    margin: 0 -2px;
+    scroll-snap-type: x proximity;
   }
 
   .navItem {
     white-space: nowrap;
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .title {
+    font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding-inline: 12px;
+  }
+
+  .sidebar {
+    border-radius: 20px;
+  }
+
+  .sidebarLabel {
+    margin-bottom: 12px;
+  }
+
+  .navItem {
+    padding: 10px 12px;
+    font-size: 0.8125rem;
+  }
+
+  .header {
+    margin-bottom: 22px;
+  }
+
+  .title {
+    font-size: 1.45rem;
+    line-height: 1.1;
+  }
+
+  .subtitle {
+    font-size: 0.875rem;
+    line-height: 1.5;
   }
 }

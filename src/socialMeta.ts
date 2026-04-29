@@ -4,14 +4,20 @@ const SITE_NAME = 'Guandalini'
 const SITE_TITLE = 'Guandalini - Blog de Tecnologia'
 const SITE_DESCRIPTION =
   'Noticias, analises e opinioes sobre tecnologia, produto, IA e o que realmente importa em tech.'
-const FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=1200&q=80&auto=format&fit=crop'
+const FALLBACK_IMAGE_PATH = '/social-card.png'
+const FALLBACK_IMAGE_WIDTH = '1200'
+const FALLBACK_IMAGE_HEIGHT = '630'
+const FALLBACK_IMAGE_TYPE = 'image/png'
 
 interface SocialMeta {
   title: string
   description: string
   url: string
   image: string
+  imageAlt: string
+  imageWidth: string
+  imageHeight: string
+  imageType: string
   type: 'website' | 'article'
 }
 
@@ -38,11 +44,22 @@ function firstTextBlock(blocks: ArticleBlock[]): string {
   return ''
 }
 
-function resolveAbsoluteUrl(value: string, origin: string): string {
+function isAllowedSocialImage(url: URL, origin: string): boolean {
+  if (url.origin === origin) return true
+
+  return url.hostname === 'images.unsplash.com'
+}
+
+function resolveSocialImage(value: string | null | undefined, origin: string): string {
+  const fallbackImage = `${origin}${FALLBACK_IMAGE_PATH}`
+  if (!value) return fallbackImage
+
   try {
-    return new URL(value, origin).toString()
+    const resolved = new URL(value, origin)
+    if (!isAllowedSocialImage(resolved, origin)) return fallbackImage
+    return resolved.toString()
   } catch {
-    return value
+    return fallbackImage
   }
 }
 
@@ -85,7 +102,11 @@ export function getDefaultSocialMeta(origin = window.location.origin): SocialMet
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     url: `${origin}/`,
-    image: FALLBACK_IMAGE,
+    image: `${origin}${FALLBACK_IMAGE_PATH}`,
+    imageAlt: 'Guandalini - Blog de Tecnologia',
+    imageWidth: FALLBACK_IMAGE_WIDTH,
+    imageHeight: FALLBACK_IMAGE_HEIGHT,
+    imageType: FALLBACK_IMAGE_TYPE,
     type: 'website',
   }
 }
@@ -96,7 +117,11 @@ export function getArticleSocialMeta(article: Article, origin = window.location.
     title: `${article.title} | ${SITE_NAME}`,
     description: truncate(descriptionSource, 200),
     url: `${origin}/noticia/${encodeURIComponent(article.slug)}`,
-    image: resolveAbsoluteUrl(article.heroImage || FALLBACK_IMAGE, origin),
+    image: resolveSocialImage(article.heroImage, origin),
+    imageAlt: article.heroCaption?.trim() || article.title,
+    imageWidth: FALLBACK_IMAGE_WIDTH,
+    imageHeight: FALLBACK_IMAGE_HEIGHT,
+    imageType: FALLBACK_IMAGE_TYPE,
     type: 'article',
   }
 }
@@ -111,8 +136,14 @@ export function applySocialMeta(meta: SocialMeta): void {
   setMetaByProperty('og:description', meta.description)
   setMetaByProperty('og:url', meta.url)
   setMetaByProperty('og:image', meta.image)
+  setMetaByProperty('og:image:secure_url', meta.image)
+  setMetaByProperty('og:image:alt', meta.imageAlt)
+  setMetaByProperty('og:image:width', meta.imageWidth)
+  setMetaByProperty('og:image:height', meta.imageHeight)
+  setMetaByProperty('og:image:type', meta.imageType)
   setMetaByName('twitter:card', 'summary_large_image')
   setMetaByName('twitter:title', meta.title)
   setMetaByName('twitter:description', meta.description)
   setMetaByName('twitter:image', meta.image)
+  setMetaByName('twitter:image:alt', meta.imageAlt)
 }

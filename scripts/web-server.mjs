@@ -15,8 +15,10 @@ const SITE_NAME = 'Guandalini'
 const SITE_TITLE = 'Guandalini - Blog de Tecnologia'
 const SITE_DESCRIPTION =
   'Noticias, analises e opinioes sobre tecnologia, produto, IA e o que realmente importa em tech.'
-const FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=1200&q=80&auto=format&fit=crop'
+const FALLBACK_IMAGE_PATH = '/social-card.png'
+const FALLBACK_IMAGE_WIDTH = '1200'
+const FALLBACK_IMAGE_HEIGHT = '630'
+const FALLBACK_IMAGE_TYPE = 'image/png'
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -77,6 +79,24 @@ function resolveAbsoluteUrl(value, origin) {
   }
 }
 
+function isAllowedSocialImage(url, origin) {
+  if (url.origin === origin) return true
+  return url.hostname === 'images.unsplash.com'
+}
+
+function resolveSocialImage(value, origin) {
+  const fallbackImage = `${origin}${FALLBACK_IMAGE_PATH}`
+  if (!value) return fallbackImage
+
+  try {
+    const resolved = new URL(value, origin)
+    if (!isAllowedSocialImage(resolved, origin)) return fallbackImage
+    return resolved.toString()
+  } catch {
+    return fallbackImage
+  }
+}
+
 function getOrigin(req) {
   const protocol = req.headers['x-forwarded-proto'] ?? 'http'
   const host = req.headers.host ?? 'localhost'
@@ -93,10 +113,16 @@ function buildMetaTags(meta) {
     `<meta property="og:description" content="${escapeHtml(meta.description)}" />`,
     `<meta property="og:url" content="${escapeHtml(meta.url)}" />`,
     `<meta property="og:image" content="${escapeHtml(meta.image)}" />`,
+    `<meta property="og:image:secure_url" content="${escapeHtml(meta.image)}" />`,
+    `<meta property="og:image:alt" content="${escapeHtml(meta.imageAlt)}" />`,
+    `<meta property="og:image:width" content="${escapeHtml(meta.imageWidth)}" />`,
+    `<meta property="og:image:height" content="${escapeHtml(meta.imageHeight)}" />`,
+    `<meta property="og:image:type" content="${escapeHtml(meta.imageType)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`,
     `<meta name="twitter:image" content="${escapeHtml(meta.image)}" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(meta.imageAlt)}" />`,
   ].join('\n    ')
 }
 
@@ -111,7 +137,11 @@ function getDefaultMeta(origin) {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     url: `${origin}/`,
-    image: FALLBACK_IMAGE,
+    image: `${origin}${FALLBACK_IMAGE_PATH}`,
+    imageAlt: 'Guandalini - Blog de Tecnologia',
+    imageWidth: FALLBACK_IMAGE_WIDTH,
+    imageHeight: FALLBACK_IMAGE_HEIGHT,
+    imageType: FALLBACK_IMAGE_TYPE,
     type: 'website',
   }
 }
@@ -126,7 +156,11 @@ function getArticleMeta(article, origin) {
     title: `${article.title} | ${SITE_NAME}`,
     description,
     url: `${origin}/noticia/${encodeURIComponent(article.slug)}`,
-    image: resolveAbsoluteUrl(article.heroImage || FALLBACK_IMAGE, origin),
+    image: resolveSocialImage(article.heroImage, origin),
+    imageAlt: article.heroCaption?.trim() || article.title,
+    imageWidth: FALLBACK_IMAGE_WIDTH,
+    imageHeight: FALLBACK_IMAGE_HEIGHT,
+    imageType: FALLBACK_IMAGE_TYPE,
     type: 'article',
   }
 }
