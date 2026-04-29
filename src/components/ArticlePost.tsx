@@ -103,10 +103,23 @@ export function ArticlePost({ articleSlug, onBack, onOpenOther, onEdit }: Articl
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  const tryNativeShare = async (payload: { title: string; text: string; url: string }) => {
+    if (!navigator.share) return false
+
+    try {
+      await navigator.share(payload)
+      return true
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return true
+      return false
+    }
+  }
+
   const share = async (mode: 'whatsapp' | 'instagram' | 'linkedin' | 'copy') => {
     const url = window.location.href
     const title = article?.title ?? ''
     const text = article?.subtitle?.trim() || title
+    const sharePayload = { title, text, url }
 
     if (mode === 'whatsapp') {
       openShareWindow(`https://wa.me/?text=${encodeURIComponent(`${title} - ${url}`)}`)
@@ -121,6 +134,12 @@ export function ArticlePost({ articleSlug, onBack, onOpenOther, onEdit }: Articl
     }
 
     if (mode === 'instagram') {
+      const shared = await tryNativeShare(sharePayload)
+      if (shared) {
+        showShareFeedback('Escolha o Instagram no menu de compartilhamento')
+        return
+      }
+
       const copied = await copyToClipboard(url)
       showShareFeedback(copied
         ? 'Link copiado para o Instagram'
@@ -128,14 +147,9 @@ export function ArticlePost({ articleSlug, onBack, onOpenOther, onEdit }: Articl
       return
     }
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, text, url })
-        showShareFeedback('Link compartilhado')
-        return
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-      }
+    if (await tryNativeShare(sharePayload)) {
+      showShareFeedback('Link compartilhado')
+      return
     }
 
     const copied = await copyToClipboard(url)
