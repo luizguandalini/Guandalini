@@ -5,6 +5,7 @@ import { useAuth } from '../auth'
 import type { Article, PinPosition } from '../types'
 import { Avatar } from './Avatar'
 import { renderRichText } from '../richText'
+import { applySocialMeta, getArticleSocialMeta, getDefaultSocialMeta } from '../socialMeta'
 
 interface ArticlePostProps {
   articleSlug: string
@@ -66,6 +67,17 @@ export function ArticlePost({ articleSlug, onBack, onOpenOther, onEdit }: Articl
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (article) {
+      applySocialMeta(getArticleSocialMeta(article))
+      return
+    }
+
+    if (!loading) {
+      applySocialMeta(getDefaultSocialMeta())
+    }
+  }, [article, loading])
 
   useEffect(() => () => {
     if (shareFeedbackTimer) clearTimeout(shareFeedbackTimer)

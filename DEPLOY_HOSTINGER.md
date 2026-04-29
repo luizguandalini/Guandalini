@@ -4,7 +4,7 @@ Este projeto esta pronto para o template **Docker and Traefik** da Hostinger.
 
 O stack de producao fica assim:
 
-- `web`: Nginx servindo o build React e fazendo proxy interno de `/api` e `/uploads`
+- `web`: servidor Node leve servindo o build React, fazendo proxy interno de `/api` e `/uploads`, e injetando metadados Open Graph/Twitter nas URLs de artigo
 - `api`: Node/Express em modo production
 - `db`: Postgres privado na rede Docker
 - `traefik-proxy`: rede externa criada pelo projeto Traefik da Hostinger

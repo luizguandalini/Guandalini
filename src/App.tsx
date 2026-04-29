@@ -12,6 +12,7 @@ import { AdminNameList } from './components/AdminNameList'
 import { badgesApi, categoriesApi } from './api'
 import { useAuth } from './auth'
 import { hrefForRoute, routeFromLocation, type AppRoute } from './routes'
+import { applySocialMeta, getDefaultSocialMeta } from './socialMeta'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -22,6 +23,12 @@ export default function App() {
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
+
+  useEffect(() => {
+    if (page.name !== 'article') {
+      applySocialMeta(getDefaultSocialMeta())
+    }
+  }, [page])
 
   const go = (p: AppRoute) => {
     const nextHref = hrefForRoute(p)
